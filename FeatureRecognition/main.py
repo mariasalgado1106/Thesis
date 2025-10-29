@@ -5,12 +5,17 @@ from OCC.Display.SimpleGui import init_display
 from OCC.Core.TopExp import TopExp_Explorer
 from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE
 from OCC.Core.BRep import BRep_Tool
-from OCC.Core.Geom import Geom_CylindricalSurface, Geom_Plane
 from OCC.Core import TopoDS
 
+from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
+from OCC.Core.GeomAbs import GeomAbs_Plane, GeomAbs_Cylinder
+from OCC.Core.TopoDS import TopoDS_Face
+from OCC.Core.Geom import Geom_CylindricalSurface, Geom_Plane
 
+
+#1. Read STEP File
 def load_step_file(filepath):
-    """Loads a STEP file and returns the main shape."""
+
     if not os.path.exists(filepath):
         print(f"Error: File not found at {filepath}")
         return None
@@ -27,67 +32,44 @@ def load_step_file(filepath):
         print("Error: Could not read STEP file.")
         return None
 
+#2. Face Type
+def get_face_geometry_type(face: TopoDS_Face):
+    surf_adaptor = BRepAdaptor_Surface(face, True)
+    face_type = surf_adaptor.GetType()
 
-# -----------------------------------------------------------
-# CHANGE 1: Replaced this entire function
-# -----------------------------------------------------------
-def get_face_geometry(face):
-    """Returns the geometry (e.g., plane, cylinder) of a TopoDS_Face."""
-    surface = BRep_Tool.Surface(face)  # This returns a Handle_Geom_Surface
-
-    # First, check for a null handle (which evaluates to False)
-    if not surface:
-        return None
-
-    # --- THIS IS THE NEW, ROBUST METHOD ---
-    # We get the C++ type name of the surface as a string
-    # This call is safe and does not crash.
-    type_name = surface.DynamicType().Name()
-
-    # Now we check the string name
-    if type_name == "Geom_CylindricalSurface":
-        # The type is correct, so we can safely downcast
-        return Geom_CylindricalSurface.DownCast(surface)
-
-    if type_name == "Geom_Plane":
-        # The type is correct, so we can safely downcast
-        return Geom_Plane.DownCast(surface)
-
-    # ... add more types as needed
-    # e.g., if type_name == "Geom_Cone":
-    #           return Geom_Cone.DownCast(surface)
-
-    return None  # Not a type we recognize
+    if face_type == GeomAbs_Cylinder:
+        return "Cylinder", surf_adaptor.Cylinder()
+    elif face_type == GeomAbs_Plane:
+        return "Plane", surf_adaptor.Plane()
+    else:
+        # You can add more types like GeomAbs_Sphere, GeomAbs_Torus etc.
+        return "Other", None
 
 
-# -----------------------------------------------------------
+#3.Adjacent Faces
 
-
-# -----------------------------------------------------------
-# CHANGE 2: Fixed PascalCase methods in this function
-# -----------------------------------------------------------
+#a target face of the all faces list is analysed
 def get_adjacent_faces(target_face, all_faces_list):
-    """Finds all faces that share at least one edge with the target_face."""
-    adjacent_faces = []
+    adjacent_faces = [] #create a list of the adj of that target face
 
-    # 1. Get all edges of the target_face
-    edge_explorer = TopExp_Explorer(target_face, TopAbs_EDGE)
-    target_edges = []
+
+    target_edges = set() #initialize a list of the target edges of the target face
+    edge_explorer = TopExp_Explorer(target_face, TopAbs_EDGE) #explore if the edge corresponds to face
     while edge_explorer.More():
-        target_edges.append(edge_explorer.Current())
-        edge_explorer.Next()
+        target_edges.add(edge_explorer.Current()) #adds to the target edges list
+        edge_explorer.Next() #proceeds to next one
 
-    # 2. Check all other faces
+    # Check edges of the other faces
     for face in all_faces_list:
-        if face.IsSame(target_face):
+        if face.IsSame(target_face): #if it's the same face as target, skip
             continue
 
-        # 3. Get edges of the other face
+        # Get edges of the other faces
         other_edge_explorer = TopExp_Explorer(face, TopAbs_EDGE)
         while other_edge_explorer.More():
-            other_edge = other_edge_explorer.Current()
+            other_edge = other_edge_explorer.Current() #list of the edges of the other face
 
-            # 4. Check if any edge is shared
+            #Check if any edge is shared
             for target_edge in target_edges:
                 if target_edge.IsSame(other_edge):
                     adjacent_faces.append(face)
@@ -101,98 +83,76 @@ def get_adjacent_faces(target_face, all_faces_list):
     return adjacent_faces
 
 
-# -----------------------------------------------------------
+#4. Feature Recognition
 
+def find_features(all_faces, face_data_list):
 
-# -----------------------------------------------------------
-# CHANGE 3: Fixed PascalCase methods in this function
-# -----------------------------------------------------------
-def find_features(shape):
-    """Main feature recognition function."""
-
-    all_faces = []
-    face_explorer = TopExp_Explorer(shape, TopAbs_FACE)
-    while face_explorer.More():
-        face = TopoDS.Face(face_explorer.Current())
-        all_faces.append(face)
-        face_explorer.Next()
-
-    print(f"Model has {len(all_faces)} faces.")
+    print("\n--- Starting Feature Recognition ---")
 
     recognized_features = []
-    processed_faces = set()  # To avoid double-counting
+    processed_faces = set()  # avoid double-counting
 
-    # --- Feature Rule: Simple Through Hole ---
-    for face in all_faces:
+    # Through Hole
+    for face_data in face_data_list:
+
+        face = face_data["face"]
         if face in processed_faces:
-            continue
-
-        geom = get_face_geometry(face)
+            continue #avoid double counting
 
         # HINT 1: Is it a cylinder?
-        if geom and isinstance(geom, Geom_CylindricalSurface):
+        if face_data["type"] == "Cylinder":
             print("Found a potential cylinder...")
 
             # HINT 2 & 3: Check adjacency
-            adj_faces = get_adjacent_faces(face, all_faces)
-
-            # This is a very simple rule. A real one would be more robust.
-            # e.g., check that *two* adjacent faces are planes
-            # and their normals are parallel to the cylinder axis.
+            # Get the data for all adjacent faces
+            adj_face_indices = face_data["adjacent_indices"]
 
             planar_neighbors = 0
-            for adj_face in adj_faces:
-                adj_geom = get_face_geometry(adj_face)
-                if adj_geom and isinstance(adj_geom, Geom_Plane):
-                    planar_neighbors += 1
+            for adj_index in adj_face_indices:
+                adj_face_data = face_data_list[adj_index]
+                if adj_face_data["type"] == "Plane":
+                    planar_neighbors += 1 #check how many planar neighbors
 
             # Rule: A cylinder with at least 2 planar neighbors
             if planar_neighbors >= 2:
                 print(">>> Found a 'Hole' feature!")
 
-                # Let's refine this to only include the *planar* neighbors
-                # This is still a simple example
-                feature_faces = [face]
-                for adj_face in adj_faces:
-                    adj_geom = get_face_geometry(adj_face)
-                    if adj_geom and isinstance(adj_geom, Geom_Plane):
-                        feature_faces.append(adj_face)
+                feature_faces = [face]  # Start with the cylinder face
+
+                # Add the adjacent planar faces to the feature
+                for adj_index in adj_face_indices:
+                    if face_data_list[adj_index]["type"] == "Plane":
+                        feature_faces.append(face_data_list[adj_index]["face"])
 
                 recognized_features.append(("Hole", feature_faces))
 
                 # Mark all faces in this feature as processed
                 for f in feature_faces:
-                    processed_faces.add(f)  # <-- This was correctly fixed before
+                    processed_faces.add(f)
 
     # --- Add more rules for your 7 other features here ---
-    # e.g., elif is_pocket_seed(face):
+    # e.g., elif face_data["type"] == "Plane": ...
 
     return recognized_features
 
 
-# -----------------------------------------------------------
+# MAIN BLOCK
 
-
-# --- Update your main block ---
 if __name__ == "__main__":
-    # 1. Initialize the viewer
+
+    # --- STEP 1: LOAD & INITIALIZE ---
+
     display, start_display, add_menu, add_function_to_menu = init_display()
 
-    # 2. Load your STEP file
-    # Using os.path.join is safer
     file_path = os.path.join("STEPFiles", "example_thoughhole.stp")
     my_shape = load_step_file(file_path)
 
     if my_shape:
-        # 3. Display the base shape
+        # Display the base shape
         display.DisplayShape(my_shape, update=True, transparency=0.8, color="GRAY")
 
-        # ------------------------------------------------------------------
-        # --- NEW CODE: Display all faces, their geometry, and adjacency ---
-        # ------------------------------------------------------------------
-        print("\n--- Model Face Analysis ---")
+        # --- STEP 2: ANALYZE MODEL ---
 
-        # 1. Get all faces into a list first
         all_faces = []
         face_explorer = TopExp_Explorer(my_shape, TopAbs_FACE)
         while face_explorer.More():
@@ -200,41 +160,48 @@ if __name__ == "__main__":
             all_faces.append(face)
             face_explorer.Next()
 
-        # 2. Create a "face-to-index" map for fast lookups
-        # We need this to print the *index* of adjacent faces, not the object
+        # Create a map for {face_object: index} for easy lookup
         face_to_index_map = {face: i for i, face in enumerate(all_faces)}
 
+        # This list will hold all our data
+        face_data_list = []
+
+        # First pass: Get geometry type for all faces
+        for i, face in enumerate(all_faces):
+            face_type, geometry = get_face_geometry_type(face)
+            face_data_list.append({
+                "index": i,
+                "face": face,
+                "type": face_type,
+                "geom": geometry,
+                "adjacent_indices": []  # Initialize empty list
+            })
+
+        # Second pass: Get adjacency for all faces
+        for face_data in face_data_list:
+            adjacent_faces = get_adjacent_faces(face_data["face"], all_faces)
+            # Store the *indices* of adjacent faces, not the objects
+            adj_indices = [face_to_index_map[adj_f] for adj_f in adjacent_faces]
+            face_data["adjacent_indices"] = adj_indices
+
+        # --- STEP 3: PRINT ANALYSIS TABLE ---
+
+        print("\n--- Model Face Analysis Table ---")
         print(f"Total faces found: {len(all_faces)}")
         print("-------------------------------------------------------------------")
-        # Added 'Adjacent Faces' column and adjusted spacing
-        print(f"{'Face #':<6} | {'Geometry Type':<25} | {'Adjacent Faces'}")
+        print(f"{'Face #':<6} | {'Face Type':<10} | {'Adjacent Faces'}")
         print("-------------------------------------------------------------------")
 
-        # 3. Loop through the list of faces
-        for face_index, face in enumerate(all_faces):
-
-            # Get geometry name
-            surface = BRep_Tool.Surface(face)
-            geom_name = "Unknown (Null Surface)"
-            if surface:
-                geom_name = surface.DynamicType().Name()
-
-                # Get adjacent faces
-            adjacent_faces = get_adjacent_faces(face, all_faces)
-
-            # Convert adjacent face objects to their indices using the map
-            adj_face_indices = [face_to_index_map[adj_face] for adj_face in adjacent_faces]
-
-            # Print the formatted table row
-            print(f"{face_index:<6} | {geom_name:<25} | {adj_face_indices}")
+        # Loop through the data we already collected and print it
+        for face_data in face_data_list:
+            print(f"{face_data['index']:<6} | {face_data['type']:<10} | {face_data['adjacent_indices']}")
 
         print("-------------------------------------------------------------------\n")
-        # -----------------------------------------------------------
-        # --- END OF NEW CODE ---
-        # -----------------------------------------------------------
 
-        # 4. Run the recognition
-        features = find_features(my_shape)
+        # --- STEP 4: RUN FEATURE RECOGNITION & VISUALIZE ---
+
+        # Pass the pre-computed data to the function for efficiency
+        features = find_features(all_faces, face_data_list)
 
         print(f"\n--- Recognized {len(features)} features ---")
 
