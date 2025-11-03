@@ -12,6 +12,11 @@ from OCC.Core.GeomAbs import GeomAbs_Plane, GeomAbs_Cylinder
 from OCC.Core.TopoDS import TopoDS_Face
 from OCC.Core.Geom import Geom_CylindricalSurface, Geom_Plane
 
+from OCC.Core.BRepOffset import BRepOffset_Analyse
+from OCC.Core.TopTools import TopTools_ListOfShape, TopTools_ListIteratorOfListOfShape
+
+
+
 
 #1. Read STEP File
 def load_step_file(filepath):
@@ -82,8 +87,47 @@ def get_adjacent_faces(target_face, all_faces_list):
 
     return adjacent_faces
 
+#4. Concave, complex...
+def classify_edge_type(face1, face2, shared_edge, analyser):
+    """Returns 'Convex', 'Concave', or 'Tangent' for a shared edge."""
+    from OCC.Core.TopTools import TopTools_ListOfShape, TopTools_ListIteratorOfListOfShape
 
-#4. Feature Recognition
+    # Get edges of each type for face1
+    convex_edges = TopTools_ListOfShape()
+    concave_edges = TopTools_ListOfShape()
+    tangent_edges = TopTools_ListOfShape()
+
+    analyser.Edges(face1, 0, concave_edges)  # ChFiDS_Concave = 0
+    analyser.Edges(face1, 1, convex_edges)  # ChFiDS_Convex = 1
+    analyser.Edges(face1, 2, tangent_edges)  # ChFiDS_Tangential = 2
+
+    # Conversion to python list
+    def occ_list_to_python(occ_list):
+        """Convert TopTools_ListOfShape to Python list."""
+        result = []
+        iterator = TopTools_ListIteratorOfListOfShape(occ_list)
+        while iterator.More():
+            result.append(iterator.Value())
+            iterator.Next()
+        return result
+
+    # Check which category the shared edge belongs to
+    for edge in occ_list_to_python(convex_edges):
+        if TopoDS.Edge(edge).IsSame(shared_edge):
+            return "Convex"
+
+    for edge in occ_list_to_python(concave_edges):
+        if TopoDS.Edge(edge).IsSame(shared_edge):
+            return "Concave"
+
+    for edge in occ_list_to_python(tangent_edges):
+        if TopoDS.Edge(edge).IsSame(shared_edge):
+            return "Tangent"
+
+    return "Unknown"
+
+
+#5. Feature Recognition
 
 def find_features(all_faces, face_data_list):
 
@@ -146,6 +190,8 @@ if __name__ == "__main__":
 
     file_path = os.path.join("STEPFiles", "example_thoughhole.stp")
     my_shape = load_step_file(file_path)
+    # Initialize the BRepOffset_Analyse for the entire shape -> determine angles for edge analysis
+    analyser = BRepOffset_Analyse(my_shape, 0.01)  # 0.01 is angle tolerance in radians
 
     if my_shape:
         # Display the base shape
@@ -184,17 +230,67 @@ if __name__ == "__main__":
             adj_indices = [face_to_index_map[adj_f] for adj_f in adjacent_faces]
             face_data["adjacent_indices"] = adj_indices
 
-        # --- STEP 3: PRINT ANALYSIS TABLE ---
+        # Third pass: Classify edge types for adjacent faces
+        for face_data in face_data_list:
+            face_data["convex_adjacent"] = []
+            face_data["concave_adjacent"] = []
+            face_data["tangent_adjacent"] = []
+
+            # Get edges of this face
+            face_edges = []
+            edge_explorer = TopExp_Explorer(face_data["face"], TopAbs_EDGE)
+            while edge_explorer.More():
+                face_edges.append(TopoDS.Edge(edge_explorer.Current()))
+                edge_explorer.Next()
+
+            # Track which adjacent faces we've already classified
+            classified_faces = set()
+
+            # For each adjacent face
+            for adj_index in face_data["adjacent_indices"]:
+                if adj_index in classified_faces:
+                    continue  # Skip if already classified
+
+                adj_face = face_data_list[adj_index]["face"]
+
+                # Find shared edge
+                adj_edge_explorer = TopExp_Explorer(adj_face, TopAbs_EDGE)
+                shared_edge_found = False
+
+                while adj_edge_explorer.More() and not shared_edge_found:
+                    adj_edge = TopoDS.Edge(adj_edge_explorer.Current())
+
+                    for face_edge in face_edges:
+                        if face_edge.IsSame(adj_edge):
+                            # Classify this edge
+                            edge_type = classify_edge_type(face_data["face"], adj_face, face_edge, analyser)
+
+                            if edge_type == "Convex":
+                                face_data["convex_adjacent"].append(adj_index)
+                            elif edge_type == "Concave":
+                                face_data["concave_adjacent"].append(adj_index)
+                            elif edge_type == "Tangent":
+                                face_data["tangent_adjacent"].append(adj_index)
+
+                            classified_faces.add(adj_index)
+                            shared_edge_found = True
+                            break
+
+                    adj_edge_explorer.Next()
 
         print("\n--- Model Face Analysis Table ---")
         print(f"Total faces found: {len(all_faces)}")
         print("-------------------------------------------------------------------")
-        print(f"{'Face #':<6} | {'Face Type':<10} | {'Adjacent Faces'}")
-        print("-------------------------------------------------------------------")
+        print(f"{'Face #':<6} | {'Type':<10} | {'Adjacent':<15} | {'Convex':<15} | {'Concave':<15} | {'Tangent'}")
+        print("-" * 95)
 
-        # Loop through the data we already collected and print it
         for face_data in face_data_list:
-            print(f"{face_data['index']:<6} | {face_data['type']:<10} | {face_data['adjacent_indices']}")
+            print(f"{face_data['index']:<6} | "
+                  f"{face_data['type']:<10} | "
+                  f"{str(face_data['adjacent_indices']):<15} | "
+                  f"{str(face_data['convex_adjacent']):<15} | "
+                  f"{str(face_data['concave_adjacent']):<15} | "
+                  f"{face_data['tangent_adjacent']}")
 
         print("-------------------------------------------------------------------\n")
 
