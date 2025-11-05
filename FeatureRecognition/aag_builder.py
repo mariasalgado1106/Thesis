@@ -3,14 +3,10 @@ from typing import List, Dict, Any, Set, Tuple
 
 
 class AAGBuilder:
-    """
-    Builder for Attributed Adjacency Graph (AAG).
-    AAG represents faces as nodes and adjacency relationships as edges,
-    with attributes for edge convexity (concave/convex/tangent).
-    """
+    """faces as nodes and adjacency as edges(concave/convex/tangent)"""
 
     def __init__(self, face_data_list: List[Dict[str, Any]]):
-        """Initialize AAG builder with face analysis data."""
+        """face analysis data."""
         self.face_data_list = face_data_list
         self.graph = nx.Graph()
         self._build_graph()
