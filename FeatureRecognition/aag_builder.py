@@ -3,10 +3,9 @@ from typing import List, Dict, Any, Set, Tuple
 
 
 class AAGBuilder:
-    """faces as nodes and adjacency as edges(concave/convex/tangent)"""
+    #faces=nodes and adjacency=edges
 
     def __init__(self, face_data_list: List[Dict[str, Any]]):
-        """face analysis data."""
         self.face_data_list = face_data_list
         self.graph = nx.Graph()
         self._build_graph()
@@ -45,57 +44,6 @@ class AAGBuilder:
         """Return the constructed AAG."""
         return self.graph
 
-    def find_subgraphs_by_pattern(self, face_types: List[str],
-                                  min_connections: int = 1) -> List[Set[int]]:
-        """
-        Find subgraphs matching a specific pattern of face types.
-
-        Args:
-            face_types: List of face types to search for (e.g., ['Cylinder', 'Plane'])
-            min_connections: Minimum number of connections required
-
-        Returns:
-            List of node sets representing matching subgraphs
-        """
-        subgraphs = []
-        visited = set()
-
-        for node in self.graph.nodes():
-            if node in visited:
-                continue
-
-            node_type = self.graph.nodes[node]["face_type"]
-            if node_type in face_types:
-                # Find connected component
-                component = self._explore_component(node, face_types, visited)
-                if len(component) >= min_connections:
-                    subgraphs.append(component)
-
-        return subgraphs
-
-    def _explore_component(self, start_node: int, allowed_types: List[str],
-                           visited: Set[int]) -> Set[int]:
-        """Explore connected component starting from a node."""
-        component = set()
-        stack = [start_node]
-
-        while stack:
-            node = stack.pop()
-            if node in visited:
-                continue
-
-            visited.add(node)
-            node_type = self.graph.nodes[node]["face_type"]
-
-            if node_type in allowed_types:
-                component.add(node)
-                # Add neighbors to explore
-                for neighbor in self.graph.neighbors(node):
-                    if neighbor not in visited:
-                        stack.append(neighbor)
-
-        return component
-
     def get_concave_neighbors(self, node_idx: int) -> List[int]:
         """Get all neighbors connected by concave edges."""
         neighbors = []
@@ -111,6 +59,16 @@ class AAGBuilder:
             if self.graph[node_idx][neighbor].get("edge_type") == "Convex":
                 neighbors.append(neighbor)
         return neighbors
+
+    def get_subgraph_without_convex_edges(self) -> nx.Graph:
+        def filter_edge(n1, n2):
+            return self.graph[n1][n2].get("edge_type") != "Convex"
+
+        return nx.subgraph_view(self.graph, filter_edge=filter_edge)
+
+    def get_connected_components(self, subgraph: nx.Graph = None) -> List[Set[int]]:
+        graph_to_use = subgraph if subgraph is not None else self.graph
+        return [set(component) for component in nx.connected_components(graph_to_use)]
 
     def print_graph_summary(self):
         """Print summary statistics of the AAG."""

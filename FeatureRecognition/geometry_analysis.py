@@ -12,7 +12,6 @@ from OCC.Core.TopTools import TopTools_ListOfShape, TopTools_ListIteratorOfListO
 
 
 def load_step_file(filepath):
-    """Load and parse a STEP file, returning the shape object."""
     if not os.path.exists(filepath):
         print(f"Error: File not found at {filepath}")
         return None
@@ -31,7 +30,6 @@ def load_step_file(filepath):
 
 
 def get_face_geometry_type(face: TopoDS_Face):
-    """Determine the geometric type of a face (Plane, Cylinder, etc.)."""
     surf_adaptor = BRepAdaptor_Surface(face, True)
     face_type = surf_adaptor.GetType()
 
@@ -44,7 +42,6 @@ def get_face_geometry_type(face: TopoDS_Face):
 
 
 def get_adjacent_faces(target_face, all_faces_list):
-    """Find all faces adjacent to a target face by shared edges."""
     adjacent_faces = []
     target_edges = set()
 
@@ -75,7 +72,6 @@ def get_adjacent_faces(target_face, all_faces_list):
 
 
 def classify_edge_type(face1, face2, shared_edge, analyser):
-    """Classify edge as Convex, Concave, or Tangent between two faces."""
     convex_edges = TopTools_ListOfShape()
     concave_edges = TopTools_ListOfShape()
     tangent_edges = TopTools_ListOfShape()
@@ -108,12 +104,6 @@ def classify_edge_type(face1, face2, shared_edge, analyser):
 
 
 def analyze_shape(my_shape):
-    """
-    Complete analysis of a shape: extract faces, determine types,
-    find adjacencies, and classify edges.
-
-    Returns: tuple of (all_faces, face_data_list, analyser)
-    """
     analyser = BRepOffset_Analyse(my_shape, 0.01)
 
     # Extract all faces
@@ -190,7 +180,6 @@ def analyze_shape(my_shape):
 
 
 def print_face_analysis_table(all_faces, face_data_list):
-    """Print a formatted table of face analysis results."""
     print("\n--- Model Face Analysis Table ---")
     print(f"Total faces found: {len(all_faces)}")
     print("-------------------------------------------------------------------")
