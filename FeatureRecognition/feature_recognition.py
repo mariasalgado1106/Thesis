@@ -87,8 +87,12 @@ class FeatureRecognizer:
         feature_colors = {
             "Through Hole": rgb_color(0, 0, 0.45),  # Dark Blue
             "Blind Hole": rgb_color(0, 0.3, 1),  # Light Blue
-            "Pocket": rgb_color(0.5, 0, 0.5),  # Purple
-            "Slot": rgb_color(1, 0.65, 0),  # Orange
+            "Through Pocket": rgb_color(0, 0.39, 0),  # Dark Green
+            "Blind Pocket": rgb_color(0.56, 0.93, 0.56),  # Light Green
+            "Through Slot": rgb_color(1, 0, 0),  # Red
+            "Blind Slot": rgb_color(1, 0.75, 0.80),  # Pink
+            "Through Step": rgb_color(1, 0.65, 0),  # Orange
+            "Blind Step": rgb_color(1, 1, 0),  # Yellow
         }
 
         # Default color for unknown features
@@ -102,7 +106,10 @@ class FeatureRecognizer:
                 display.DisplayShape(face, update=False, color=color)
 
         display.FitAll()
-        print("Legend: Dark Blue=Through Hole, Light Blue=Blind Hole")
+        print("Legend: Dark Blue=Through Hole, Light Blue=Blind Hole, "
+              "Dark Green=Through Pocket, Light Green=Blind Pocket, "
+              "Red=Through Slot, Pink=Blind Slot, "
+              "Orange=Through Step, Yellow=Blind Step")
 
     def visualize_edge_types(self, display):
         from OCC.Core.TopExp import TopExp_Explorer

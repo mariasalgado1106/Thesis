@@ -121,19 +121,17 @@ class AAGBuilder:
         ax1.set_title("Full AAG (All Edges)", fontsize=16, fontweight='bold')
         pos = nx.spring_layout(self.graph, k=2, iterations=50, seed=42)
 
-        # Draw nodes colored by face type
+        # Draw nodes colored by face type with gray shades
         face_types = nx.get_node_attributes(self.graph, 'face_type')
         node_colors = []
         for node in self.graph.nodes():
             ftype = face_types.get(node, "Unknown")
             if ftype == "Cylinder":
-                node_colors.append('lightblue')
+                node_colors.append((0.7, 0.7, 0.7))  # Light Gray
             elif ftype == "Plane":
-                node_colors.append('lightgreen')
-            elif ftype == "Cone":
-                node_colors.append('orange')
+                node_colors.append((0.5, 0.5, 0.5))  # Medium Gray
             else:
-                node_colors.append('gray')
+                node_colors.append((0.3, 0.3, 0.3))  # Dark Gray
 
         nx.draw_networkx_nodes(self.graph, pos, node_color=node_colors, node_size=500, ax=ax1)
         nx.draw_networkx_labels(self.graph, pos, font_size=8, ax=ax1)
@@ -147,13 +145,26 @@ class AAGBuilder:
                          if d.get('edge_type') == 'Tangent']
 
         nx.draw_networkx_edges(self.graph, pos, edgelist=convex_edges,
-                               edge_color='blue', width=2, label='Convex', ax=ax1)
+                               edge_color=(0, 0, 1), width=2, label='Convex', ax=ax1)  # blue
         nx.draw_networkx_edges(self.graph, pos, edgelist=concave_edges,
-                               edge_color='red', width=2, label='Concave', ax=ax1)
+                               edge_color=(1, 0, 0), width=2, label='Concave', ax=ax1)  # red
         nx.draw_networkx_edges(self.graph, pos, edgelist=tangent_edges,
-                               edge_color='green', width=2, label='Tangent', ax=ax1)
+                               edge_color=(0, 1, 0), width=2, label='Tangent', ax=ax1)  # green
 
-        ax1.legend(loc='upper left')
+        # Add legend for Plot 1 (combine face types and edge types)
+        from matplotlib.patches import Patch
+        from matplotlib.lines import Line2D
+
+        legend_elements_ax1 = [
+            # Face types
+            Patch(facecolor=(0.5, 0.5, 0.5), label='Plane'),
+            Patch(facecolor=(0.7, 0.7, 0.7), label='Cylinder'),
+            # Edge types
+            Line2D([0], [0], color=(0, 0, 1), linewidth=2, label='Convex'),
+            Line2D([0], [0], color=(1, 0, 0), linewidth=2, label='Concave'),
+            Line2D([0], [0], color=(0, 1, 0), linewidth=2, label='Tangent'),
+        ]
+        ax1.legend(handles=legend_elements_ax1, loc='upper left', fontsize=8)
         ax1.axis('off')
 
         # Plot 2: Subgraph without convex edges + recognized features
@@ -175,22 +186,30 @@ class AAGBuilder:
         for node in subgraph.nodes():
             feature = feature_map.get(node)
             if feature == "Through Hole":
-                node_colors_sub.append('darkblue')
+                node_colors_sub.append((0, 0, 0.45))  # Dark Blue
             elif feature == "Blind Hole":
-                node_colors_sub.append('cyan')
-            elif feature == "Pocket":
-                node_colors_sub.append('purple')
-            elif feature == "Slot":
-                node_colors_sub.append('orange')
+                node_colors_sub.append((0, 0.3, 1))  # Light Blue
+            elif feature == "Through Pocket":
+                node_colors_sub.append((0, 0.39, 0))  # Dark Green
+            elif feature == "Blind Pocket":
+                node_colors_sub.append((0.56, 0.93, 0.56))  # Light Green
+            elif feature == "Through Slot":
+                node_colors_sub.append((1, 0, 0))  # Red
+            elif feature == "Blind Slot":
+                node_colors_sub.append((1, 0.75, 0.80))  # Pink
+            elif feature == "Through Step":
+                node_colors_sub.append((1, 0.65, 0))  # Orange
+            elif feature == "Blind Step":
+                node_colors_sub.append((1, 1, 0))  # Yellow
             else:
-                # Unrecognized - color by face type
+                # Unrecognized - color by face type with gray shades
                 ftype = face_types.get(node, "Unknown")
                 if ftype == "Cylinder":
-                    node_colors_sub.append('lightblue')
+                    node_colors_sub.append((0.7, 0.7, 0.7))  # Light Gray
                 elif ftype == "Plane":
-                    node_colors_sub.append('lightgreen')
+                    node_colors_sub.append((0.5, 0.5, 0.5))  # Medium Gray
                 else:
-                    node_colors_sub.append('gray')
+                    node_colors_sub.append((0.3, 0.3, 0.3))  # Dark Gray
 
         nx.draw_networkx_nodes(subgraph, pos, node_color=node_colors_sub,
                                node_size=500, ax=ax2)
@@ -203,21 +222,25 @@ class AAGBuilder:
                              if d.get('edge_type') == 'Tangent']
 
         nx.draw_networkx_edges(subgraph, pos, edgelist=concave_edges_sub,
-                               edge_color='red', width=2, label='Concave', ax=ax2)
+                               edge_color=(1, 0, 0), width=2, label='Concave', ax=ax2)  # red
         nx.draw_networkx_edges(subgraph, pos, edgelist=tangent_edges_sub,
-                               edge_color='green', width=2, label='Tangent', ax=ax2)
+                               edge_color=(0, 1, 0), width=2, label='Tangent', ax=ax2)  # green
 
         # Add legend for features
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor='darkblue', label='Through Hole'),
-            Patch(facecolor='cyan', label='Blind Hole'),
-            Patch(facecolor='purple', label='Pocket'),
-            Patch(facecolor='orange', label='Slot'),
-            Patch(facecolor='lightgreen', label='Plane (unrecognized)'),
-            Patch(facecolor='lightblue', label='Cylinder (unrecognized)'),
+            Patch(facecolor=(0, 0, 0.45), label='Through Hole'),  # Dark Blue
+            Patch(facecolor=(0, 0.3, 1), label='Blind Hole'),  # Light Blue
+            Patch(facecolor=(0, 0.39, 0), label='Through Pocket'),  # Dark Green
+            Patch(facecolor=(0.56, 0.93, 0.56), label='Blind Pocket'),  # Light Green
+            Patch(facecolor=(1, 0, 0), label='Through Slot'),  # Red
+            Patch(facecolor=(1, 0.75, 0.80), label='Blind Slot'),  # Pink
+            Patch(facecolor=(1, 0.65, 0), label='Through Step'),  # Orange
+            Patch(facecolor=(1, 1, 0), label='Blind Step'),  # Yellow
+            Patch(facecolor=(0.5, 0.5, 0.5), label='Plane'),  # Medium Gray
+            Patch(facecolor=(0.7, 0.7, 0.7), label='Cylinder'),  # Light Gray
         ]
-        ax2.legend(handles=legend_elements, loc='upper left')
+        ax2.legend(handles=legend_elements, loc='upper left', fontsize=8)
         ax2.axis('off')
 
         plt.tight_layout()
@@ -233,4 +256,6 @@ class AAGBuilder:
         for i, comp in enumerate(components):
             feature_names = [feature_map.get(idx, "Unrecognized") for idx in comp]
             print(f"  Component {i + 1}: {comp} - {set(feature_names)}")
+
+
 
