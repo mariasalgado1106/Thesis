@@ -81,27 +81,34 @@ class FeatureRecognizer:
         return stats
 
     def visualize_features(self, display):
-        """
-        Visualize recognized features with different colors.
+        from OCC.Display.OCCViewer import rgb_color
 
-        Args:
-            display: OCC display object for rendering
-        """
-        colors = ["RED", "BLUE", "GREEN", "YELLOW", "ORANGE", "CYAN", "MAGENTA", "BLACK"]
+        # Define feature-specific colors
+        feature_colors = {
+            "Through Hole": rgb_color(0, 0, 0.45),  # Dark Blue
+            "Blind Hole": rgb_color(0, 0.3, 1),  # Light Blue
+            "Pocket": rgb_color(0.5, 0, 0.5),  # Purple
+            "Slot": rgb_color(1, 0.65, 0),  # Orange
+        }
+
+        # Default color for unknown features
+        default_color = rgb_color(0.7, 0.7, 0.7)  # Light Gray
 
         for i, (feature_name, faces) in enumerate(self.recognized_features):
             print(f"Feature {i + 1}: {feature_name} (composed of {len(faces)} faces)")
 
-            color = colors[i % len(colors)]
+            color = feature_colors.get(feature_name, default_color)
             for face in faces:
                 display.DisplayShape(face, update=False, color=color)
 
         display.FitAll()
+        print("Legend: Dark Blue=Through Hole, Light Blue=Blind Hole")
 
     def visualize_edge_types(self, display):
         from OCC.Core.TopExp import TopExp_Explorer
         from OCC.Core.TopAbs import TopAbs_EDGE
         from OCC.Core import TopoDS
+        from OCC.Display.OCCViewer import rgb_color
 
         print("\n--- Visualizing Edge Types ---")
 
@@ -139,13 +146,13 @@ class FeatureRecognizer:
 
         # Display edges with appropriate colors
         color_map = {
-            "Convex": "BLUE",
-            "Concave": "RED",
-            "Tangent": "GREEN"
+            "Convex": rgb_color(0, 0, 1),  # Blue
+            "Concave": rgb_color(1, 0, 0),  # Red
+            "Tangent": rgb_color(0, 1, 0)  # Green
         }
 
         for edge, edge_type in edge_classifications.items():
-            color = color_map.get(edge_type, "GRAY")
+            color = color_map.get(edge_type, rgb_color(0.5, 0.5, 0.5))  # Gray
             display.DisplayShape(edge, update=False, color=color)
 
         print(f"Displayed {len(edge_classifications)} classified edges")
