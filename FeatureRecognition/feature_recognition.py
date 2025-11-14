@@ -5,7 +5,6 @@ from aag_builder import AAGBuilder
 
 class FeatureRecognizer:
     def __init__(self, face_data_list: List[Dict[str, Any]], aag: AAGBuilder):
-        """Initialize feature recognizer with face data and AAG."""
         self.face_data_list = face_data_list
         self.aag = aag
         self.recognized_features = []
@@ -14,6 +13,7 @@ class FeatureRecognizer:
         print("\n--- Starting Feature Recognition ---")
 
         self.recognized_features = []
+        self.recognized_features_with_components = []
         processed_faces = set()
 
         # Generate subgraph and components
@@ -23,16 +23,11 @@ class FeatureRecognizer:
 
         # Pass components to different feature detectors
         self.recognize_holes(components, graph, processed_faces)
-        # self.recognize_pockets(components, graph, processed_faces)
-        # self.recognize_slots(components, graph, processed_faces)
 
         print(f"\n--- Recognized {len(self.recognized_features)} features ---")
         return self.recognized_features
 
     def recognize_holes(self, components, graph, processed_faces):
-        #Through Hole: 1 node (isolated) + cylindrical
-        #Blind Hole: 2 nodes, 1 concave edge (cylindrical + planar)
-
         for component in components:
             if any(idx in processed_faces for idx in component):
                 continue
@@ -41,7 +36,6 @@ class FeatureRecognizer:
             face_types = [graph.nodes[idx]['face_type'] for idx in component_list]
             face_objects = [graph.nodes[idx]['face_object'] for idx in component_list]
 
-            # Count concave edges within component
             concave_edges = 0
             for node in component_list:
                 concave_neighbors = self.aag.get_concave_neighbors(node)
@@ -53,6 +47,9 @@ class FeatureRecognizer:
             if len(component) == 1 and face_types[0] == "Cylinder" and concave_edges == 0:
                 print(f">>> Recognized 'Through Hole' at face {component_list[0]}")
                 self.recognized_features.append(("Through Hole", face_objects))
+                self.recognized_features_with_components.append(
+                    ("Through Hole", face_objects, component)
+                )
                 processed_faces.update(component)
 
             # Blind Hole
@@ -60,6 +57,9 @@ class FeatureRecognizer:
                 if face_types.count("Cylinder") == 1 and face_types.count("Plane") == 1:
                     print(f">>> Recognized 'Blind Hole' at faces {component_list}")
                     self.recognized_features.append(("Blind Hole", face_objects))
+                    self.recognized_features_with_components.append(
+                        ("Blind Hole", face_objects, component)
+                    )
                     processed_faces.update(component)
 
     def recognize_pockets(self, processed_faces: set):

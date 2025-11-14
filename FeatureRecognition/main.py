@@ -8,8 +8,6 @@ from feature_recognition import FeatureRecognizer
 
 
 def main():
-    """Main execution function."""
-
     # Initialize display
     display, start_display, add_menu, add_function_to_menu = init_display()
 
@@ -50,7 +48,7 @@ def main():
 
     # Visualize results
     print("\n=== VISUALIZATION ===")
-    choice = input("Visualize: (1) Features, (2) Edge Types, (3) Both? [1/2/3]: ")
+    choice = input("Visualize: (1) Features, (2) Edge Types, (3) Both, (4) AAG Graph? [1/2/3/4]: ")
 
     if choice in ["1", "3"]:
         recognizer.visualize_features(display)
@@ -58,12 +56,22 @@ def main():
     if choice in ["2", "3"]:
         recognizer.visualize_edge_types(display)
 
-    if choice not in ["1", "2", "3"]:
+    if choice == "4":
+        print("\nGenerating AAG graph visualization...")
+        aag_builder.visualize_graph(
+            recognized_features=recognizer.recognized_features_with_components,
+            save_path="aag_visualization.png"
+        )
+        print("Graph visualization complete! Check 'aag_visualization.png'")
+        # Return early since matplotlib.show() is blocking
+        return
+
+    if choice not in ["1", "2", "3", "4"]:
         recognizer.visualize_features(display)  # Default
 
-    # Start the display
     start_display()
 
 
 if __name__ == "__main__":
     main()
+
