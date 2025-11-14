@@ -14,7 +14,7 @@ def main():
     display, start_display, add_menu, add_function_to_menu = init_display()
 
     # Load STEP file
-    file_path = os.path.join("STEPFiles", "example_thoughhole.stp")
+    file_path = os.path.join("STEPFiles", "Part3.stp")
     my_shape = load_step_file(file_path)
 
     if not my_shape:

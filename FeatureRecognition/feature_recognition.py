@@ -4,10 +4,6 @@ from aag_builder import AAGBuilder
 
 
 class FeatureRecognizer:
-    """
-    Feature recognition engine using AAG and rule-based patterns.
-    """
-
     def __init__(self, face_data_list: List[Dict[str, Any]], aag: AAGBuilder):
         """Initialize feature recognizer with face data and AAG."""
         self.face_data_list = face_data_list
@@ -15,63 +11,64 @@ class FeatureRecognizer:
         self.recognized_features = []
 
     def recognize_all_features(self) -> List[Tuple[str, List[TopoDS_Face]]]:
-        """Run all feature recognition rules."""
         print("\n--- Starting Feature Recognition ---")
 
         self.recognized_features = []
         processed_faces = set()
 
-        # Run different feature detectors
-        self._recognize_holes(processed_faces)
-        # Add more feature recognition methods here:
-        # self._recognize_pockets(processed_faces)
-        # self._recognize_slots(processed_faces)
-        # self._recognize_steps(processed_faces)
+        # Generate subgraph and components
+        subgraph = self.aag.get_subgraph_without_convex_edges()
+        components = self.aag.get_connected_components(subgraph)
+        graph = self.aag.get_graph()
+
+        # Pass components to different feature detectors
+        self.recognize_holes(components, graph, processed_faces)
+        # self.recognize_pockets(components, graph, processed_faces)
+        # self.recognize_slots(components, graph, processed_faces)
 
         print(f"\n--- Recognized {len(self.recognized_features)} features ---")
         return self.recognized_features
 
-    def _recognize_holes(self, processed_faces: set):
-        """Detect through holes and blind holes."""
-        for face_data in self.face_data_list:
-            face = face_data["face"]
-            if face in processed_faces:
+    def recognize_holes(self, components, graph, processed_faces):
+        #Through Hole: 1 node (isolated) + cylindrical
+        #Blind Hole: 2 nodes, 1 concave edge (cylindrical + planar)
+
+        for component in components:
+            if any(idx in processed_faces for idx in component):
                 continue
 
-            # Rule: Cylinder with at least 2 planar neighbors
-            if face_data["type"] == "Cylinder":
-                print(f"Found potential cylinder at face {face_data['index']}...")
+            component_list = list(component)
+            face_types = [graph.nodes[idx]['face_type'] for idx in component_list]
+            face_objects = [graph.nodes[idx]['face_object'] for idx in component_list]
 
-                adj_face_indices = face_data["adjacent_indices"]
-                planar_neighbors = 0
+            # Count concave edges within component
+            concave_edges = 0
+            for node in component_list:
+                concave_neighbors = self.aag.get_concave_neighbors(node)
+                for neighbor in concave_neighbors:
+                    if neighbor in component and neighbor > node:
+                        concave_edges += 1
 
-                for adj_index in adj_face_indices:
-                    adj_face_data = self.face_data_list[adj_index]
-                    if adj_face_data["type"] == "Plane":
-                        planar_neighbors += 1
+            # Through Hole
+            if len(component) == 1 and face_types[0] == "Cylinder" and concave_edges == 0:
+                print(f">>> Recognized 'Through Hole' at face {component_list[0]}")
+                self.recognized_features.append(("Through Hole", face_objects))
+                processed_faces.update(component)
 
-                if planar_neighbors >= 2:
-                    print(f">>> Recognized 'Hole' feature at face {face_data['index']}!")
+            # Blind Hole
+            elif len(component) == 2 and concave_edges == 1:
+                if face_types.count("Cylinder") == 1 and face_types.count("Plane") == 1:
+                    print(f">>> Recognized 'Blind Hole' at faces {component_list}")
+                    self.recognized_features.append(("Blind Hole", face_objects))
+                    processed_faces.update(component)
 
-                    feature_faces = [face]
-
-                    # Add adjacent planar faces
-                    for adj_index in adj_face_indices:
-                        if self.face_data_list[adj_index]["type"] == "Plane":
-                            feature_faces.append(self.face_data_list[adj_index]["face"])
-
-                    self.recognized_features.append(("Hole", feature_faces))
-
-                    for f in feature_faces:
-                        processed_faces.add(f)
-
-    def _recognize_pockets(self, processed_faces: set):
+    def recognize_pockets(self, processed_faces: set):
         """Detect pocket features using AAG patterns."""
         # Implement pocket recognition logic
         # Example: Look for planar faces with concave edges forming a depression
         pass
 
-    def _recognize_slots(self, processed_faces: set):
+    def recognize_slots(self, processed_faces: set):
         """Detect slot features."""
         # Implement slot recognition logic
         pass
@@ -102,10 +99,6 @@ class FeatureRecognizer:
         display.FitAll()
 
     def visualize_edge_types(self, display):
-        """
-        Visualize edges colored by their type (concave/convex/tangent).
-        This helps understand the geometric relationships.
-        """
         from OCC.Core.TopExp import TopExp_Explorer
         from OCC.Core.TopAbs import TopAbs_EDGE
         from OCC.Core import TopoDS
