@@ -11,22 +11,24 @@ from OCC.Core.BRepOffset import BRepOffset_Analyse
 from OCC.Core.TopTools import TopTools_ListOfShape, TopTools_ListIteratorOfListOfShape
 
 
-def load_step_file(filepath):
-    if not os.path.exists(filepath):
-        print(f"Error: File not found at {filepath}")
+def load_step_file(step_file):
+    if not os.path.exists(step_file):
+        print("ERROR: NO STEP FILE")
         return None
 
-    reader = STEPControl_Reader()
-    status = reader.ReadFile(filepath)
+    reader_occ = STEPControl_Reader() #translate step file info to smth readable by OCC
 
-    if status == IFSelect_RetDone:
+    if reader_occ.ReadFile(step_file) == IFSelect_RetDone: #reads file --> success or failure
         print("STEP file read successfully!")
-        reader.TransferRoots()
-        shape = reader.OneShape()
+        reader_occ.TransferRoots() #step data --> occ internal representation
+        shape = reader_occ.OneShape() #shape with all geometry
         return shape
     else:
-        print("Error: Could not read STEP file.")
+        print("ERROR: Could not read STEP file.")
         return None
+
+def get_stock_box (shape):
+    stock_box = shape.BoundingBox() #CHECK THIS!!!!!!!!!!!!!!!!
 
 
 def get_face_geometry_type(face: TopoDS_Face):
