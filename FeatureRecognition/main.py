@@ -1,9 +1,7 @@
 import os
 from OCC.Display.SimpleGui import init_display
-
-# Import your custom modules
 from geometry_analysis import (load_step_file, analyze_shape, print_face_analysis_table)
-from aag_builder import AAGBuilder, build_aag_graph, build_aag_subgraph
+from aag_builder import AAGBuilder, visualize_aag
 from feature_recognition import FeatureRecognizer
 
 
@@ -12,7 +10,7 @@ def main():
     display, start_display, add_menu, add_function_to_menu = init_display()
 
     # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "example_thoughhole.stp"))
+    my_shape = load_step_file(os.path.join("STEPFiles", "Part3.stp"))
 
     if not my_shape:
         return
@@ -28,8 +26,8 @@ def main():
 
     # PART 2: Build AAG
     print("\n PART 2: AAG CONSTRUCTION")
-    build_aag_subgraph (my_shape)
-    build_aag_graph(my_shape)
+    visualize_aag(my_shape)
+
     aag_builder = AAGBuilder(face_data_list)
     aag_builder.print_graph_summary()
 
