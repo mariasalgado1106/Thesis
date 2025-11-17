@@ -1,17 +1,99 @@
 import networkx as nx
 from typing import List, Dict, Any, Set, Tuple
+from geometry_analysis import (load_step_file, analyze_shape)
+
+# 1. BUILD GRAPH AND SUBGRAPH
+def build_aag_graph(my_shape): #graph with all edge types
+    G = nx.Graph()
+    all_faces, face_data_list, _ = analyze_shape(my_shape)
+
+    for face_data in face_data_list:
+        i = face_data["index"]
+        G.add_node(i, face_type=face_data["type"], geometry=face_data["geom"],
+                   adjacent_faces=face_data["adjacent_indices"])
+
+    # Add ALL edge types
+    for face_data in face_data_list:
+        current_face = face_data["index"]
+
+        for adj_idx in face_data["convex_adjacent"]:
+            if not G.has_edge(current_face, adj_idx):
+                G.add_edge(current_face, adj_idx, edge_type="convex")
+
+        for adj_idx in face_data["concave_adjacent"]:
+            if not G.has_edge(current_face, adj_idx):
+                G.add_edge(current_face, adj_idx, edge_type="concave")
+
+        for adj_idx in face_data["tangent_adjacent"]:
+            if not G.has_edge(current_face, adj_idx):
+                G.add_edge(current_face, adj_idx, edge_type="tangent")
+
+    print(f"TRIAL Total nodes: {G.number_of_nodes()}")
+    print(f"TRIAL Total edges (complete graph): {G.number_of_edges()}")
+
+    convex_count = sum(1 for x, y, z in G.edges(data=True) if z.get('edge_type') == 'convex')
+    print(f"TRIAL Total convex edges: {convex_count}")
+
+    concave_count = sum(1 for x, y, z in G.edges(data=True) if z.get('edge_type') == 'concave')
+    print(f"TRIAL Total concave edges: {concave_count}")
+
+    tangent_count = sum(1 for x, y, z in G.edges(data=True) if z.get('edge_type') == 'tangent')
+    print(f"TRIAL Total tangent edges: {tangent_count}")
+
+    return G
+
+
+def build_aag_subgraph (my_shape):
+    G = build_aag_graph(my_shape)#subgraph without convex
+    def filter_edge(n1, n2): #n1 and n2 are the 2 nodes
+        return G[n1][n2].get("edge_type") != "convex" #if convex it returns false and removes
+    subG = nx.subgraph_view(G, filter_edge=filter_edge)
+
+    return subG
+
+# 2. ANALYSE SUBGRAPH FOR FR (connected faces)
+
+def get_subgraphs (subG):
+    subgraphs = list(nx.connected_components(subG)) #the subgraphs/components
+    for i, nodes in enumerate(subgraphs): #i=nr of the component, node=nodes of the component/subgraph
+        subgraph = subG.subgraph(nodes) #creates a subgraph view that excludes all the others
+        n_faces = len(nodes)
+        n_concave = sum(1 for _, _, type in subgraph.edges(data=True) if type.get('edge_type') == 'concave')
+        print(f"Component {i}: faces={n_faces}, concave_edges={n_concave})
+    return subgraphs
+
+
+# 3. VISUALIZE GRAPHS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class AAGBuilder:
     #faces=nodes and adjacency=edges
-
     def __init__(self, face_data_list: List[Dict[str, Any]]):
         self.face_data_list = face_data_list
         self.graph = nx.Graph()
         self._build_graph()
 
     def _build_graph(self):
-        """Construct the AAG from face data."""
         # Add nodes with face attributes
         for face_data in self.face_data_list:
             self.graph.add_node(
@@ -41,7 +123,6 @@ class AAGBuilder:
                     self.graph.add_edge(face_idx, adj_idx, edge_type="Tangent")
 
     def get_graph(self) -> nx.Graph:
-        """Return the constructed AAG."""
         return self.graph
 
     def get_concave_neighbors(self, node_idx: int) -> List[int]:

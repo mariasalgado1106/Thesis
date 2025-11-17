@@ -3,7 +3,7 @@ from OCC.Display.SimpleGui import init_display
 
 # Import your custom modules
 from geometry_analysis import (load_step_file, analyze_shape, print_face_analysis_table)
-from aag_builder import AAGBuilder
+from aag_builder import AAGBuilder, build_aag_graph, build_aag_subgraph
 from feature_recognition import FeatureRecognizer
 
 
@@ -18,17 +18,18 @@ def main():
         return
 
     # Display base shape
-    display.DisplayShape(my_shape, update=True, transparency=0.8, color="GRAY")
+    display.DisplayShape(my_shape, update=True, transparency=0.8)
 
     # PART 1: Geometry Analysis
-    print("\n=== PART 1: GEOMETRY ANALYSIS ===")
+    print("\n PART 1: GEOMETRY ANALYSIS")
     all_faces, face_data_list, analyser = analyze_shape(my_shape)
     print_face_analysis_table(all_faces, face_data_list)
-    #testing_functions(my_shape)
 
 
     # PART 2: Build AAG
-    print("\n=== PART 2: AAG CONSTRUCTION ===")
+    print("\n PART 2: AAG CONSTRUCTION")
+    build_aag_subgraph (my_shape)
+    build_aag_graph(my_shape)
     aag_builder = AAGBuilder(face_data_list)
     aag_builder.print_graph_summary()
 
@@ -37,7 +38,7 @@ def main():
     print(f"AAG contains {len(graph_data['nodes'])} nodes and {len(graph_data['edges'])} edges")
 
     # PART 3: Feature Recognition
-    print("\n=== PART 3: FEATURE RECOGNITION ===")
+    print("\n PART 3: FEATURE RECOGNITION")
     recognizer = FeatureRecognizer(face_data_list, aag_builder)
     features = recognizer.recognize_all_features()
 
@@ -48,7 +49,7 @@ def main():
         print(f"  {feature_type}: {count}")
 
     # Visualize results
-    print("\n=== VISUALIZATION ===")
+    print("\n VISUALIZATION")
     choice = input("Visualize: (1) Features, (2) Edge Types, (3) Both, (4) AAG Graph? [1/2/3/4]: ")
 
     if choice in ["1", "3"]:
