@@ -20,20 +20,20 @@ class AAGBuilder:
             "edge_convex": (0.0, 0.0, 1.0),  # Blue
             "edge_tangent": (0.0, 0.0, 0.0),  # Black
 
-            # FEATURES (Node Borders)
-            "feat_hole_through": (0.000, 0.000, 0.45),  # Dark Blue
+            # FEATURES
+            "feat_hole_through": (0.0, 0.0, 0.45),  # Dark Blue
             "feat_hole_blind": (0, 0.3, 1),  # Light Blue
-            "feat_pocket_through": (0.000, 0.392, 0.000),  # Dark Green
-            "feat_pocket_blind": (0.196, 0.804, 0.196),  # Light Green
-            "feat_slot_through": (1.000, 0.078, 0.576),  # Dark Pink
-            "feat_slot_blind": (1.000, 0.412, 0.706),  # Hot Pink
-            "feat_step": (1.000, 0.549, 0.000),  # Dark Orange
-            "feat_other": (1.000, 0.2, 0.1),  # Light Orange
+            "feat_pocket_through": (0.0, 0.39, 0.0),  # Dark Green
+            "feat_pocket_blind": (0.2, 0.8, 0.2),  # Light Green
+            "feat_slot_through": (1.0, 0.08, 0.58),  # Dark Pink
+            "feat_slot_blind": (1.0, 0.41, 0.71),  # Hot Pink
+            "feat_step": (1.0, 0.55, 0.0),  # Dark Orange
+            "feat_other": (1.0, 0.2, 0.1),  # Light Orange
 
-            # GEOMETRY (Node Fills)
-            "geo_plane": (0.961, 0.961, 0.961),  # Light Grey
-            "geo_cylinder": (1.000, 0.980, 0.804),  # Pale Yellow
-            "geo_other": (0.980, 0.941, 0.902),  # Beige
+            # GEOMETRY
+            "geo_plane": (0.96, 0.96, 0.96),  # Light Grey
+            "geo_cylinder": (1.0, 0.98, 0.8),  # Pale Yellow
+            "geo_other": (0.98, 0.94, 0.90),  # Beige
         }
 
     # 1. BUILD GRAPH AND SUBGRAPH

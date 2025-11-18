@@ -60,6 +60,8 @@ def get_adjacent_faces(shape, target_face):
     return list(adjacent_faces)
 
 
+
+
 def classify_edge_type(face1, face2, shared_edge, analyser):
     # Prepare occ lists for each type
     convex_edges = TopTools_ListOfShape()
