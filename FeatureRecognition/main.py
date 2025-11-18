@@ -1,7 +1,7 @@
 import os
 from OCC.Display.SimpleGui import init_display
 from geometry_analysis import (load_step_file, analyze_shape, print_face_analysis_table)
-from aag_builder import AAGBuilder, visualize_aag
+from aag_builder import AAGBuilder
 from feature_recognition import FeatureRecognizer
 
 
@@ -26,48 +26,34 @@ def main():
 
     # PART 2: Build AAG
     print("\n PART 2: AAG CONSTRUCTION")
-    visualize_aag(my_shape)
-
-    aag_builder = AAGBuilder(face_data_list)
-    aag_builder.print_graph_summary()
-
-    # Optional: Export graph data for visualization
-    graph_data = aag_builder.export_graph_data()
-    print(f"AAG contains {len(graph_data['nodes'])} nodes and {len(graph_data['edges'])} edges")
+    builder = AAGBuilder(my_shape)
 
     # PART 3: Feature Recognition
-    print("\n PART 3: FEATURE RECOGNITION")
-    recognizer = FeatureRecognizer(face_data_list, aag_builder)
+    '''print("\n PART 3: FEATURE RECOGNITION")
+    recognizer = FeatureRecognizer(face_data_list, analyse_subgraphs)
     features = recognizer.recognize_all_features()
 
     # Print statistics
     stats = recognizer.get_feature_statistics()
     print("\nFeature Statistics:")
     for feature_type, count in stats.items():
-        print(f"  {feature_type}: {count}")
+        print(f"  {feature_type}: {count}")'''
 
     # Visualize results
     print("\n VISUALIZATION")
-    choice = input("Visualize: (1) Features, (2) Edge Types, (3) Both, (4) AAG Graph? [1/2/3/4]: ")
+    choice = input("Visualize: (1) Features, (2) Edge Types, (3) Both, (4) AAG + Subgraphs [1/2/3/4]: ")
 
-    if choice in ["1", "3"]:
+    '''if choice in ["1", "3"]:
         recognizer.visualize_features(display)
 
     if choice in ["2", "3"]:
-        recognizer.visualize_edge_types(display)
+        recognizer.visualize_edge_types(display)'''
 
     if choice == "4":
-        print("\nGenerating AAG graph visualization...")
-        aag_builder.visualize_graph(
-            recognized_features=recognizer.recognized_features_with_components,
-            save_path="aag_visualization.png"
-        )
-        print("Graph visualization complete! Check 'aag_visualization.png'")
-        # Return early since matplotlib.show() is blocking
-        return
+        builder.visualize_aag()
 
-    if choice not in ["1", "2", "3", "4"]:
-        recognizer.visualize_features(display)  # Default
+    '''if choice not in ["1", "2", "3", "4"]:
+        recognizer.visualize_features(display)  # Default'''
 
     start_display()
 
