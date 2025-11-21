@@ -32,11 +32,7 @@ def main():
     recognizer = FeatureRecognizer(subgraphs_info)
     features = recognizer.recognize_all_features()
     '''
-    # Print statistics
-    stats = recognizer.get_feature_statistics()
-    print("\nFeature Statistics:")
-    for feature_type, count in stats.items():
-        print(f"  {feature_type}: {count}")'''
+    # Print statistics --> feature count'''
 
     # Visualize results
     print("\n VISUALIZATION")

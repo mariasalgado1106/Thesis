@@ -26,6 +26,11 @@ class FeatureRecognizer:
             cyl_count = face_types.count("Cylinder")
             plane_count = face_types.count("Plane")
 
+
+            #Computer Vision -> Open Cv -> just look at graph and recognize the feature
+            # this would be more innovative
+
+
             #Through Hole
             #Only 1 node (face) and cylindrical and 0 concave edges
             if n_faces >= 1 and cyl_count == n_faces and n_concave == 0:

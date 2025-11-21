@@ -93,7 +93,7 @@ def classify_edge_type(face1, face2, shared_edge, analyser):
 
 
 def analyze_shape(my_shape):
-    analyser = BRepOffset_Analyse(my_shape, 0.01)
+    analyser = BRepOffset_Analyse(my_shape, 0.01) #make sre it considers right normals
     t = TopologyExplorer(my_shape)
 
     all_faces = []

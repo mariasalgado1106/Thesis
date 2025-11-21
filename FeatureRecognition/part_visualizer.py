@@ -18,7 +18,7 @@ class PartVisualizer:
     def find_shared_edge(self, face_edges, adj_face):
         edge_explorer_adj = TopExp_Explorer(adj_face, TopAbs_EDGE)
         while edge_explorer_adj.More():
-            adj_edge = topods.Edge(edge_explorer_adj.Current())  # Use topods.Edge()
+            adj_edge = topods.Edge(edge_explorer_adj.Current())
             for face_edge in face_edges:
                 if face_edge.IsSame(adj_edge):
                     return adj_edge
@@ -37,11 +37,11 @@ class PartVisualizer:
             face_edges = []
             edge_explorer = TopExp_Explorer(current_face, TopAbs_EDGE)
             while edge_explorer.More():
-                edge = topods.Edge(edge_explorer.Current())  # Use topods.Edge()
+                edge = topods.Edge(edge_explorer.Current())
                 face_edges.append(edge)
                 edge_explorer.Next()
 
-            def draw_edges(adj_indices, color_key):
+            def draw_edges(adj_indices, color):
                 for adj_idx in adj_indices:
                     pair_faces = tuple(sorted((current_idx, adj_idx)))
                     if pair_faces in processed_edges:
@@ -51,7 +51,7 @@ class PartVisualizer:
                     shared_edge = self.find_shared_edge(face_edges, adj_face)
 
                     if shared_edge:
-                        edge_color = self.builder.colors_rgb.get(color_key)
+                        edge_color = self.builder.colors_rgb.get(color)
                         occ_color = rgb_color(*edge_color)
                         display.DisplayShape(shared_edge, update=False, color=occ_color)
                         processed_edges.add(pair_faces)
