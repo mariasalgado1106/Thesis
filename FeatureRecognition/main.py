@@ -1,6 +1,6 @@
 import os
 from OCC.Display.SimpleGui import init_display
-from geometry_analysis import (load_step_file, analyze_shape, print_face_analysis_table)
+from geometry_analysis import (load_step_file, analyze_shape, print_face_analysis_table, print_edge_analysis_table)
 from aag_builder import AAGBuilder_2D
 from feature_recognition import FeatureRecognizer
 from part_visualizer import PartVisualizer
@@ -11,15 +11,16 @@ def main():
     display, start_display, add_menu, add_function_to_menu = init_display()
 
     # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "Part3.stp"))
+    my_shape = load_step_file(os.path.join("STEPFiles", "example_thoughhole.stp"))
 
     if not my_shape:
         return
 
     # PART 1: Geometry Analysis
     print("\n PART 1: GEOMETRY ANALYSIS")
-    all_faces, face_data_list, analyser = analyze_shape(my_shape)
+    all_faces, face_data_list, analyser, all_edges, edge_data_list = analyze_shape(my_shape)
     print_face_analysis_table(all_faces, face_data_list)
+    print_edge_analysis_table(all_edges, edge_data_list)
 
 
     # PART 2: Build AAG

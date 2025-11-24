@@ -198,7 +198,7 @@ def analyze_shape(my_shape):
                 elif edge_type == "Tangent":
                     face_data['tangent_adjacent'].append(adj_index)
 
-    return all_faces, face_data_list, analyser,edge_data_list
+    return all_faces, face_data_list, analyser, all_edges, edge_data_list
 
 
 def print_face_analysis_table(all_faces, face_data_list):
@@ -217,3 +217,20 @@ def print_face_analysis_table(all_faces, face_data_list):
               f"{face_data['tangent_adjacent']}")
 
     print("-------------------------------------------------------------------\n")
+
+def print_edge_analysis_table(all_edges, edge_data_list):
+    print("\n--- Model Edge Analysis Table ---")
+    print(f"Total edges found: {len(all_edges)}")
+    print("-------------------------------------------------------------------")
+    print(f"{'Edge #':<6} | {'Geometry':<10} | {'Length':<15} | {'Type':<15} ")
+    print("-" * 95)
+
+    for edge_data in edge_data_list:
+        print(f"{edge_data['index']:<6} | "
+              f"{edge_data['edge_geom']:<10} | "
+              f"{str(edge_data['edge_length']):<15} | "
+              f"{str(edge_data['classification']):<15}")
+
+    print("-------------------------------------------------------------------\n")
+
+
