@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
-class AAGBuilder:
+class AAGBuilder_2D:
     def __init__(self, my_shape):
         self.shape = my_shape
         self.all_faces, self.face_data_list, _ = analyze_shape(self.shape)

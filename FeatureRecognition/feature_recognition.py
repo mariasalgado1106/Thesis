@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from aag_builder import AAGBuilder
+from aag_builder import AAGBuilder_2D
 
 class FeatureRecognizer:
     def __init__(self, subgraphs_info):

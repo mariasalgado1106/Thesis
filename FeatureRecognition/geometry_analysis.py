@@ -1,16 +1,24 @@
 import os
+import numpy as np
 from OCC.Core.STEPControl import STEPControl_Reader
 from OCC.Core.IFSelect import IFSelect_RetDone
 from OCC.Core.TopExp import TopExp_Explorer
 from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE
 from OCC.Core.TopoDS import TopoDS_Face
 from OCC.Core import TopoDS
-from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
-from OCC.Core.GeomAbs import GeomAbs_Plane, GeomAbs_Cylinder
+from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
 from OCC.Core.BRepOffset import BRepOffset_Analyse
 from OCC.Core.TopTools import TopTools_ListOfShape, TopTools_ListIteratorOfListOfShape
 from OCC.Extend.TopologyUtils import TopologyExplorer
 from OCC.Core.BRep import BRep_Tool
+from OCC.Core.STEPControl import STEPControl_Reader
+from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+from OCC.Core.GeomAbs import (GeomAbs_Plane, GeomAbs_Cylinder,
+    GeomAbs_Line, GeomAbs_Circle, GeomAbs_Ellipse, GeomAbs_Hyperbola,
+    GeomAbs_Parabola, GeomAbs_BezierCurve, GeomAbs_BSplineCurve,
+    GeomAbs_OffsetCurve, GeomAbs_OtherCurve
+)
+
 
 
 def load_step_file(step_file):
@@ -91,6 +99,31 @@ def classify_edge_type(face1, face2, shared_edge, analyser):
 
     return "Unknown"
 
+def get_edge_info(edge):
+    adaptor = BRepAdaptor_Curve(edge)
+    edge_geom = adaptor.GetType()
+
+    first_param = adaptor.FirstParameter()
+    last_param = adaptor.LastParameter()
+
+    is_straight = edge_geom == GeomAbs_Line
+    num_points = 50 if not is_straight else 2
+    params = np.linspace(first_param, last_param, num_points)
+
+    points = []
+    for param in params:
+        pnt = adaptor.Value(param)
+        points.append([pnt.X(), pnt.Y(), pnt.Z()])
+
+    points = np.array(points)
+
+    edge_length = 0
+    for j in range(len(points) - 1):
+        edge_length += np.linalg.norm(points[j + 1] - points[j])
+
+    return edge_geom, edge_length
+
+
 
 def analyze_shape(my_shape):
     analyser = BRepOffset_Analyse(my_shape, 0.01) #make sre it considers right normals
@@ -119,6 +152,7 @@ def analyze_shape(my_shape):
             "tangent_adjacent" : []
         })
 
+
     # Second pass: adjacency
     for face_data in face_data_list:
         adjacent_faces = get_adjacent_faces(my_shape, face_data["face"])
@@ -126,13 +160,36 @@ def analyze_shape(my_shape):
         face_data["adjacent_indices"] = adj_indices
 
     # Third pass: edge classification
+    all_edges = []
+    edge_explorer = TopExp_Explorer(my_shape, TopAbs_EDGE)
+    while edge_explorer.More():
+        all_edges.append(TopoDS.Edge(edge_explorer.Current()))
+        edge_explorer.Next()
+
+    edge_to_index_map = {edge: i for i, edge in enumerate(all_edges)}
+    edge_data_list = []
+
+    for i, edge in enumerate(all_edges):
+        edge_geom, edge_length = get_edge_info(edge)
+        edge_data_list.append({
+            "index": i,
+            "edge": edge,
+            "edge_geom": edge_geom,
+            "edge_length": edge_length,
+            "classification": []
+        })
+
+
     for face_data in face_data_list:
         face = face_data['face']
         edges = t.edges_from_face(face)
         for edge in edges:
+            edge_index = edge_to_index_map[edge]
+            edge_data = edge_data_list[edge_index]
             adjacent_faces = [f for f in t.faces_from_edge(edge) if not f.IsSame(face)] #excludes actual afce
             for adj_face in adjacent_faces:
                 edge_type = classify_edge_type(face, adj_face, edge, analyser)
+                edge_data['classification'].append(edge_type)
                 adj_index = face_to_index_map[adj_face]
                 if edge_type == "Convex":
                     face_data['convex_adjacent'].append(adj_index)
@@ -141,7 +198,7 @@ def analyze_shape(my_shape):
                 elif edge_type == "Tangent":
                     face_data['tangent_adjacent'].append(adj_index)
 
-    return all_faces, face_data_list, analyser
+    return all_faces, face_data_list, analyser,edge_data_list
 
 
 def print_face_analysis_table(all_faces, face_data_list):

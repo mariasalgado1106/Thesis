@@ -1,7 +1,7 @@
 import os
 from OCC.Display.SimpleGui import init_display
 from geometry_analysis import (load_step_file, analyze_shape, print_face_analysis_table)
-from aag_builder import AAGBuilder
+from aag_builder import AAGBuilder_2D
 from feature_recognition import FeatureRecognizer
 from part_visualizer import PartVisualizer
 
@@ -24,7 +24,7 @@ def main():
 
     # PART 2: Build AAG
     print("\n PART 2: AAG CONSTRUCTION")
-    builder = AAGBuilder(my_shape)
+    builder = AAGBuilder_2D(my_shape)
     subgraphs_info = builder.analyse_subgraphs()
 
     # PART 3: Feature Recognition
