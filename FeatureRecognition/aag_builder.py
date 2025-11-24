@@ -5,10 +5,14 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
+class AAGBuilder_3D:
+    def __init__(self, my_shape):
+        self.my_shape = my_shape
+
 class AAGBuilder_2D:
     def __init__(self, my_shape):
         self.shape = my_shape
-        self.all_faces, self.face_data_list, _ = analyze_shape(self.shape)
+        self.all_faces, self.face_data_list, _ , _, _ = analyze_shape(self.shape)
 
         self.G = None
         self.subG = None
@@ -39,7 +43,7 @@ class AAGBuilder_2D:
     # 1. BUILD GRAPH AND SUBGRAPH
     def build_aag_graph(self): #graph with all edge types
         self.G = nx.Graph()
-        all_faces, face_data_list, _ = analyze_shape(self.shape)
+        all_faces, face_data_list, _, _, _ = analyze_shape(self.shape)
 
         for face_data in self.face_data_list:
             i = face_data["index"]
@@ -202,4 +206,5 @@ class AAGBuilder_2D:
             ax.axis('off')
         plt.tight_layout()
         plt.show()
+
 
