@@ -293,7 +293,7 @@ class AAGBuilder_3D:
         )
         fig.show()
 
-        # --- Optional: Print basic stats ---
+        # --- Print basic stats ---
         # Print number of faces per type, edge coverage, etc.
         print("\nFace type distribution:")
         for ftype, count in Counter(face_types).items():
@@ -307,6 +307,18 @@ class AAGBuilder_3D:
         print(f"\nTotal faces: {len(self.face_data_list)}")
         print(f"Total mesh edges: {len(self.edge_data_list)}")
         print(f"Graph/AAG links: {len(drawn_pairs)}")
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ########################################
