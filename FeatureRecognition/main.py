@@ -1,7 +1,7 @@
 import os
 from OCC.Display.SimpleGui import init_display
 from geometry_analysis import (load_step_file, analyze_shape, print_face_analysis_table, print_edge_analysis_table)
-from aag_builder import AAGBuilder_2D
+from aag_builder import AAGBuilder_2D, AAGBuilder_3D
 from feature_recognition import FeatureRecognizer
 from part_visualizer import PartVisualizer
 
@@ -25,8 +25,9 @@ def main():
 
     # PART 2: Build AAG
     print("\n PART 2: AAG CONSTRUCTION")
-    builder = AAGBuilder_2D(my_shape)
-    subgraphs_info = builder.analyse_subgraphs()
+    builder2D = AAGBuilder_2D(my_shape)
+    subgraphs_info = builder2D.analyse_subgraphs()
+    builder3D = AAGBuilder_3D(my_shape)
 
     # PART 3: Feature Recognition
     print("\n PART 3: FEATURE RECOGNITION")
@@ -37,8 +38,8 @@ def main():
 
     # Visualize results
     print("\n VISUALIZATION")
-    choice = input("Visualize: (1) Edge Types, (2) Features, (3) Both, (4) AAG + Subgraphs [1/2/3/4]: ")
-    viz = PartVisualizer(builder, recognizer)
+    choice = input("Visualize: (1) Edge Types, (2) Features, (3) Both, (4) 2D AAG + Subgraphs, (5) 3D AAG [1/2/3/4/5]: ")
+    viz = PartVisualizer(builder2D, recognizer)
 
     if choice in ["1", "3"]:
         viz.display_base_shape(display, transparency=0.6) 
@@ -49,9 +50,12 @@ def main():
         viz.visualize_features(display)
     '''
     if choice == "4":
-        builder.visualize_aag()
+        builder2D.visualize_2d_aag()
 
-    '''if choice not in ["1", "2", "3", "4"]:
+    if choice == "5":
+        builder3D.visualize_3d_aag()
+
+    '''if choice not in ["1", "2", "3", "4", "5"]:
         recognizer.visualize_features(display)  # Default'''
 
     start_display()

@@ -18,6 +18,8 @@ from OCC.Core.GeomAbs import (GeomAbs_Plane, GeomAbs_Cylinder,
     GeomAbs_Parabola, GeomAbs_BezierCurve, GeomAbs_BSplineCurve,
     GeomAbs_OffsetCurve, GeomAbs_OtherCurve
 )
+from OCC.Core.GProp import GProp_GProps
+from OCC.Core.BRepGProp import brepgprop
 
 
 
@@ -42,7 +44,8 @@ def get_stock_box (shape):
 
 
 
-def get_face_geometry_type(face):
+def get_face_geometry(face):
+
     adaptor = BRepAdaptor_Surface(face, True) #adapts a face so it can be treated as a surface
     face_type = adaptor.GetType()
     if face_type == GeomAbs_Cylinder:
@@ -51,6 +54,8 @@ def get_face_geometry_type(face):
         return "Plane", adaptor.Plane()
     else:
         return "Other", None
+
+
 
 
 def get_adjacent_faces(shape, target_face):
@@ -140,12 +145,17 @@ def analyze_shape(my_shape):
 
     # First pass: geometry types
     for i, face in enumerate(all_faces):
-        face_type, geometry = get_face_geometry_type(face)
+        face_type, geometry = get_face_geometry(face)
+        props = GProp_GProps()
+        brepgprop.SurfaceProperties(face, props)
+        center = props.CentreOfMass()
+        face_center = ([center.X(), center.Y(), center.Z()])
         face_data_list.append({
             "index": i,
             "face": face,
             "type": face_type,
             "geom": geometry,
+            "face_center": face_center,
             "adjacent_indices": [],
             "convex_adjacent" : [],
             "concave_adjacent" : [],
@@ -198,6 +208,7 @@ def analyze_shape(my_shape):
             "edge": edge,
             "edge_geom": edge_geom,
             "edge_length": edge_length,
+            "faces_of_edge" : [],
             "classification": []
         })
 
@@ -225,6 +236,7 @@ def analyze_shape(my_shape):
             for adj_face in adjacent_faces:
                 edge_type = classify_edge_type(face, adj_face, edge, analyser)
                 edge_data['classification'].append(edge_type)
+                edge_data['faces_of_edge'].append((face_data['index'], face_to_index_map[adj_face]))
 
                 adj_index = face_to_index_map[adj_face]
                 if edge_type == "Convex":

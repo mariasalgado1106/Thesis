@@ -1,16 +1,66 @@
-import networkx as nx
-from typing import List, Dict, Any, Set, Tuple
-from geometry_analysis import (load_step_file, analyze_shape)
+import json
+from collections import defaultdict, Counter
+
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
+import plotly.graph_objects as go
+import plotly.io as pio
+import networkx as nx
+from typing import List, Dict, Any, Set, Tuple
+
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
-from OCC.Extend.TopologyUtils import TopologyExplorer
-from OCC.Core.TopLoc import TopLoc_Location
 from OCC.Core.BRep import BRep_Tool
 from OCC.Core.TopAbs import TopAbs_FORWARD
-import json
+from OCC.Core.TopLoc import TopLoc_Location
+from OCC.Extend.TopologyUtils import TopologyExplorer
+from OCC.Core.STEPControl import STEPControl_Reader
+from OCC.Core.GProp import GProp_GProps
+from OCC.Core.BRepGProp import brepgprop_SurfaceProperties, brepgprop_LinearProperties
+from OCC.Core.GeomAbs import (GeomAbs_Plane, GeomAbs_Cylinder, GeomAbs_Cone,
+                              GeomAbs_Sphere, GeomAbs_Torus, GeomAbs_Circle)
+from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
 
+from geometry_analysis import load_step_file, analyze_shape
+
+
+
+
+'''
+#I ONLY NEED THIS IF I GET FROM OUTSIDE FILES, WHICH IM NOT USING
+def edge_key(edge, tolerance=1e-6):
+    try:
+        curve_adapter = BRepAdaptor_Curve(edge)
+        curve_type = curve_adapter.GetType()
+
+        if curve_type == GeomAbs_Circle:
+            circle = curve_adapter.Circle()
+            center = circle.Location()
+            radius = circle.Radius()
+            center_key = (
+                round(center.X() / tolerance) * tolerance,
+                round(center.Y() / tolerance) * tolerance,
+                round(center.Z() / tolerance) * tolerance,
+                round(radius / tolerance) * tolerance
+            )
+            return ("circle",) + center_key
+        else:
+            vertices = list(TopologyExplorer(edge).vertices())
+            if len(vertices) != 2:
+                return None
+            p1 = BRep_Tool.Pnt(vertices[0])
+            p2 = BRep_Tool.Pnt(vertices[1])
+            coords = sorted([
+                (round(p1.X() / tolerance) * tolerance, round(p1.Y() / tolerance) * tolerance,
+                 round(p1.Z() / tolerance) * tolerance),
+                (round(p2.X() / tolerance) * tolerance, round(p2.Y() / tolerance) * tolerance,
+                 round(p2.Z() / tolerance) * tolerance)
+            ])
+            return ("line",) + tuple(coords[0] + coords[1])
+    except:
+        return None
+'''
 
 #generate a triangulated mesh of the part for Plotly visualization
 def mesh_shape_for_visualization(shape, linear_deflection=0.1):
@@ -45,8 +95,8 @@ def extract_mesh_data(shape):
     return vertices, triangles
 
 #SAVE AS JSON FILE THE AAG RESULTS -> REMOVE IF I WON'T USE THIS
-def save_aag_results(my_shape, filename):
-    #change this
+'''def save_aag_results(my_shape, filename):
+    #change this'''
 
 
 
@@ -57,27 +107,206 @@ class AAGBuilder_3D:
         (self.all_faces, self.face_data_list, self.analyser, self.all_edges,
          self.edge_data_list) = analyze_shape(self.shape)
 
+        self.colors_rgb = {
+            # EDGES
+            "edge_concave": (1.0, 0.0, 0.0),  # Red
+            "edge_convex": (0.0, 0.0, 1.0),  # Blue
+            "edge_tangent": (0.0, 0.0, 0.0),  # Black
+
+            # FEATURES
+            "feat_hole_through": (0.0, 0.0, 0.45),  # Dark Blue
+            "feat_hole_blind": (0, 0.3, 1),  # Light Blue
+            "feat_pocket_through": (0.0, 0.39, 0.0),  # Dark Green
+            "feat_pocket_blind": (0.2, 0.8, 0.2),  # Light Green
+            "feat_slot_through": (1.0, 0.08, 0.58),  # Dark Pink
+            "feat_slot_blind": (1.0, 0.41, 0.71),  # Hot Pink
+            "feat_step": (1.0, 0.55, 0.0),  # Dark Orange
+            "feat_other": (1.0, 0.2, 0.1),  # Light Orange
+
+            # GEOMETRY
+            "geo_plane": (0.96, 0.96, 0.96),  # Light Grey
+            "geo_cylinder": (1.0, 0.98, 0.8),  # Pale Yellow
+            "geo_other": (0.98, 0.94, 0.90),  # Beige
+        }
+
     def load_shape (self):
         mesh_shape_for_visualization(self.shape, linear_deflection=0.1)
         self.vertices, self.triangles = extract_mesh_data(self.shape)
 
+    '''
+    #ONLY NEED IF I LOAD A FILE AND WANT TO CLASSIFY/MAP THE EDGES
     def load_convexity_results(self):
         self.edge_classification = {}
         for edge_data in self.edge_data_list:
-            edge_idx = edge_data['index']
-            self.edge_classification[edge_idx] = {
+            edge = edge_data['edge']
+            self.edge_classification[edge] = {
+                'edge_idx': edge_data['index'],
+                'edge' : edge_data['edge'],
                 'classification': edge_data['classification'],
                 'edge_geom': edge_data['edge_geom'],
                 'edge_length': edge_data['edge_length']
             }
         print(f"Loaded convexity results for {len(self.edge_data_list)} edges")
 
+    
+    def build_consistent_edge_mapping(self): #link the edges from the file to the ones from the edge_data_list
+        topo = TopologyExplorer(self.shape)
+        self.edges = list(topo.edges()) #get the edges
+        self.edge_id_map = {}
+        self.convexity_to_current_map = {}
 
+        for conv_id in self.edge_classification.keys():
+            if conv_id < len(self.edges):
+                edge = self.edges[conv_id]
+                key = edge_key(edge)
+                if key is not None:
+                    self.edge_id_map[key] = conv_id
+                    self.convexity_to_current_map[conv_id] = conv_id
 
+        print(f"Direct mapping: {len(self.edge_id_map)} edges mapped")
 
+        unmapped_conv = set(self.edge_classification.keys()) - set(self.convexity_to_current_map.keys())
+        for conv_id in unmapped_conv:
+            conv_data = self.edge_classification[conv_id]
+            conv_length = conv_data['edge_length']
+            for curr_id, edge in enumerate(self.edges):
+                if curr_id in self.convexity_to_current_map.values():
+                    continue
+                try:
+                    props = GProp_GProps()
+                    brepgprop_LinearProperties(edge, props)
+                    curr_length = props.Mass()
+                    if abs(curr_length - conv_length) < 0.1:
+                        key = edge_key(edge)
+                        if key is not None and key not in self.edge_id_map:
+                            self.edge_id_map[key] = conv_id
+                            self.convexity_to_current_map[conv_id] = curr_id
+                            break
+                except:
+                    continue
 
+        final_unmapped = set(self.edge_classification.keys()) - set(self.convexity_to_current_map.keys())
+        print(f"Final: {len(self.edge_id_map)} mapped, {len(final_unmapped)} unmapped")'''
 
+    def visualize_3d_aag(self, show_mesh=True, mesh_opacity=0.2, node_size=10):
+        import plotly.graph_objects as go
+        from collections import Counter
 
+        fig = go.Figure()
+
+        # --- 1. Mesh visualization ---
+        if hasattr(self, "vertices") and hasattr(self, "triangles") and show_mesh:
+            fig.add_trace(go.Mesh3d(
+                x=[v[0] for v in self.vertices],
+                y=[v[1] for v in self.vertices],
+                z=[v[2] for v in self.vertices],
+                i=[t[0] for t in self.triangles],
+                j=[t[1] for t in self.triangles],
+                k=[t[2] for t in self.triangles],
+                color='lightblue',
+                opacity=mesh_opacity,
+                name='3D Model',
+                flatshading=True,
+            ))
+
+        # --- 2. Face type scatter ---
+        face_types = [f['type'] for f in self.face_data_list]
+        centers = [f['face_center'] for f in self.face_data_list]
+        face_colors = {
+            'Plane': 'blue', 'Cylinder': 'red', 'Cone': 'orange',
+            'Sphere': 'green', 'Torus': 'purple', 'Other': 'brown', 'Unknown': 'gray'
+        }
+        unique_types = set(face_types)
+        for ftype in unique_types:
+            indices = [i for i, ft in enumerate(face_types) if ft == ftype]
+            if not indices:
+                continue
+            xs = [centers[i][0] for i in indices]
+            ys = [centers[i][1] for i in indices]
+            zs = [centers[i][2] for i in indices]
+            fig.add_trace(go.Scatter3d(
+                x=xs, y=ys, z=zs, mode='markers+text',
+                marker=dict(size=node_size, color=face_colors.get(ftype, 'gray'),
+                            line=dict(width=2, color='black')),
+                text=[str(i) for i in indices], textposition='middle center',
+                textfont=dict(size=8, color='white'),
+                name=f'{ftype} faces ({len(indices)})',
+                hovertemplate="Face %{text}<br>Type: " + ftype +
+                              "<br>Center: (%{x:.2f}, %{y:.2f}, %{z:.2f})<extra></extra>"
+            ))
+
+        # --- 3. Edge links / AAG edges ---
+        edge_groups = {
+            'Convex': {'edges': [], 'color': 'blue', 'width': 4, 'name': 'Convex edges'},
+            'Concave': {'edges': [], 'color': 'red', 'width': 4, 'name': 'Concave edges'},
+            'Tangent': {'edges': [], 'color': 'green', 'width': 3, 'name': 'Tangent edges'},
+            'Unknown': {'edges': [], 'color': 'gray', 'width': 2, 'name': 'Unknown edges'}
+        }
+        # Option: avoid duplicate edge lines (undirected)
+        drawn_pairs = set()
+        for edge in self.edge_data_list:
+            # faces_of_edge stores index pairs like (i, j)
+            for pair in edge['faces_of_edge']:
+                i, j = pair
+                idx_pair = tuple(sorted([i, j]))
+                if idx_pair in drawn_pairs or i == j:
+                    continue
+                drawn_pairs.add(idx_pair)
+                classification = edge['classification'][0] if edge['classification'] else 'Unknown'
+                group = edge_groups.get(classification, edge_groups['Unknown'])
+                group['edges'].append((i, j, edge))
+
+        for group in edge_groups.values():
+            if not group['edges']:
+                continue
+            x_line, y_line, z_line = [], [], []
+            hover_text = []
+            for (f1, f2, e_info) in group['edges']:
+                x1, y1, z1 = centers[f1]
+                x2, y2, z2 = centers[f2]
+                x_line.extend([x1, x2, None])
+                y_line.extend([y1, y2, None])
+                z_line.extend([z1, z2, None])
+                hover_label = (
+                    f"Edge {e_info['index']}<br>Faces: {f1} ↔ {f2}<br>"
+                    f"Classification: {e_info['classification']}<br>"
+                    f"Length: {e_info['edge_length']:.2f}"
+                )
+                hover_text.extend([hover_label, hover_label, None])
+            fig.add_trace(go.Scatter3d(
+                x=x_line, y=y_line, z=z_line, mode='lines',
+                line=dict(color=group['color'], width=group['width']),
+                name=f"{group['name']} ({len(group['edges'])})",
+                hovertemplate="%{text}<extra></extra>", text=hover_text
+            ))
+
+        # --- 4. Layout and show ---
+        fig.update_layout(
+            title="AAG Graph from 3D Model",
+            scene=dict(
+                xaxis_title="X", yaxis_title="Y", zaxis_title="Z",
+                aspectmode="data",
+                camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
+            ),
+            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+            width=1200, height=900
+        )
+        fig.show()
+
+        # --- Optional: Print basic stats ---
+        # Print number of faces per type, edge coverage, etc.
+        print("\nFace type distribution:")
+        for ftype, count in Counter(face_types).items():
+            print(f"  {ftype}: {count}")
+        edge_class_flat = []
+        for edge in self.edge_data_list:
+            edge_class_flat.extend(edge['classification'])
+        print("\nEdge classification distribution:")
+        for cls, count in Counter(edge_class_flat).items():
+            print(f"  {cls}: {count}")
+        print(f"\nTotal faces: {len(self.face_data_list)}")
+        print(f"Total mesh edges: {len(self.edge_data_list)}")
+        print(f"Graph/AAG links: {len(drawn_pairs)}")
 
 
 ########################################
@@ -189,7 +418,7 @@ class AAGBuilder_2D:
 
 
     # 3. VISUALIZE GRAPHS
-    def visualize_aag (self):
+    def visualize_2d_aag (self):
         if self.G is None:
             self.build_aag_graph()
         if self.subG is None:
