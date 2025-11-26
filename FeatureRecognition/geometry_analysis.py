@@ -282,35 +282,3 @@ def print_edge_analysis_table(all_edges, edge_data_list):
     print("-------------------------------------------------------------------\n")
 
 
-if __name__ == "__main__":
-
-    step_path = r"C:\Users\Maria Salgado\PycharmProjects\Thesis\FeatureRecognition\STEPFiles\example_thoughhole.stp"
-    # <---- CHANGE THIS
-
-    shape = load_step_file(step_path)
-    if shape is None:
-        exit(1)
-
-    all_faces, face_data_list, analyser, all_edges, edge_data_list = analyze_shape(shape)
-
-    # -----------------------------------------------------------
-    # Verify that edges are truly unique
-    # -----------------------------------------------------------
-    print("\n--- Verification: Unique Edge Check in Main ---")
-    print(f"Edges returned by analyze_shape(): {len(all_edges)}")
-
-    dup_count = 0
-    for i in range(len(all_edges)):
-        for j in range(i + 1, len(all_edges)):
-            if all_edges[i].IsSame(all_edges[j]):
-                dup_count += 1
-
-    if dup_count == 0:
-        print("✓ No duplicate edges remain. Deduplication successful!")
-    else:
-        print(f"✗ WARNING: Found {dup_count} duplicates after analysis.")
-    print("-----------------------------------------------------------\n")
-
-    print_face_analysis_table(all_faces, face_data_list)
-    print_edge_analysis_table(all_edges, edge_data_list)
-
