@@ -11,8 +11,7 @@ def main():
     display, start_display, add_menu, add_function_to_menu = init_display()
 
     # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "example_thoughhole.stp"))
-
+    my_shape = load_step_file(os.path.join("STEPFiles", "Part3.stp"))
     if not my_shape:
         return
 
@@ -27,7 +26,9 @@ def main():
     print("\n PART 2: AAG CONSTRUCTION")
     builder2D = AAGBuilder_2D(my_shape)
     subgraphs_info = builder2D.analyse_subgraphs()
+
     builder3D = AAGBuilder_3D(my_shape)
+    builder3D.load_shape()
 
     # PART 3: Feature Recognition
     print("\n PART 3: FEATURE RECOGNITION")
@@ -38,22 +39,35 @@ def main():
 
     # Visualize results
     print("\n VISUALIZATION")
-    choice = input("Visualize: (1) Edge Types, (2) Features, (3) Both, (4) 2D AAG + Subgraphs, (5) 3D AAG [1/2/3/4/5]: ")
+    choice = input(
+        "Visualize: "
+        "(1) Edge Types, "
+        "(2) Features, "
+        "(3) Both, "
+        "(4) 2D AAG + Subgraphs, "
+        "(5) 3D AAG, "
+        "(6) 3D AAG without convex edges "
+        "[1/2/3/4/5/6]: "
+    )
+
     viz = PartVisualizer(builder2D, recognizer)
 
     if choice in ["1", "3"]:
-        viz.display_base_shape(display, transparency=0.6) 
+        viz.display_base_shape(display, transparency=0.6)
         viz.visualize_edges(display)
-    '''
-    if choice in ["2", "3"]:
-        viz.display_base_shape(display, transparency=0.0) 
-        viz.visualize_features(display)
-    '''
+
+    # if choice in ["2", "3"]:
+    #     viz.display_base_shape(display, transparency=0.0)
+    #     viz.visualize_features(display)
+
     if choice == "4":
         builder2D.visualize_2d_aag()
 
     if choice == "5":
-        builder3D.visualize_3d_aag()
+        builder3D.visualize_3d_aag(hide_convex=False)
+
+    if choice == "6":
+        builder3D.visualize_3d_aag(hide_convex=True)
 
     '''if choice not in ["1", "2", "3", "4", "5"]:
         recognizer.visualize_features(display)  # Default'''

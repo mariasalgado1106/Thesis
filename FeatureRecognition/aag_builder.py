@@ -188,13 +188,13 @@ class AAGBuilder_3D:
         final_unmapped = set(self.edge_classification.keys()) - set(self.convexity_to_current_map.keys())
         print(f"Final: {len(self.edge_id_map)} mapped, {len(final_unmapped)} unmapped")'''
 
-    def visualize_3d_aag(self, show_mesh=True, mesh_opacity=0.2, node_size=10):
+    def visualize_3d_aag(self, show_mesh=True, mesh_opacity=0.2, node_size=10, hide_convex=False):
         import plotly.graph_objects as go
         from collections import Counter
 
         fig = go.Figure()
 
-        # --- 1. Mesh visualization ---
+        # 1. Mesh visualization
         if hasattr(self, "vertices") and hasattr(self, "triangles") and show_mesh:
             fig.add_trace(go.Mesh3d(
                 x=[v[0] for v in self.vertices],
@@ -209,13 +209,20 @@ class AAGBuilder_3D:
                 flatshading=True,
             ))
 
-        # --- 2. Face type scatter ---
+        # 2. Face centers colored by face type
         face_types = [f['type'] for f in self.face_data_list]
         centers = [f['face_center'] for f in self.face_data_list]
+
         face_colors = {
-            'Plane': 'blue', 'Cylinder': 'red', 'Cone': 'orange',
-            'Sphere': 'green', 'Torus': 'purple', 'Other': 'brown', 'Unknown': 'gray'
+            'Plane': 'blue',
+            'Cylinder': 'red',
+            'Cone': 'orange',
+            'Sphere': 'green',
+            'Torus': 'purple',
+            'Other': 'brown',
+            'Unknown': 'gray'
         }
+
         unique_types = set(face_types)
         for ftype in unique_types:
             indices = [i for i, ft in enumerate(face_types) if ft == ftype]
@@ -226,33 +233,67 @@ class AAGBuilder_3D:
             zs = [centers[i][2] for i in indices]
             fig.add_trace(go.Scatter3d(
                 x=xs, y=ys, z=zs, mode='markers+text',
-                marker=dict(size=node_size, color=face_colors.get(ftype, 'gray'),
-                            line=dict(width=2, color='black')),
-                text=[str(i) for i in indices], textposition='middle center',
+                marker=dict(
+                    size=node_size,
+                    color=face_colors.get(ftype, 'gray'),
+                    line=dict(width=2, color='black')
+                ),
+                text=[str(i) for i in indices],
+                textposition='middle center',
                 textfont=dict(size=8, color='white'),
                 name=f'{ftype} faces ({len(indices)})',
                 hovertemplate="Face %{text}<br>Type: " + ftype +
                               "<br>Center: (%{x:.2f}, %{y:.2f}, %{z:.2f})<extra></extra>"
             ))
 
-        # --- 3. Edge links / AAG edges ---
+        # 3. Edge links / AAG edges using self.colors_rgb
         edge_groups = {
-            'Convex': {'edges': [], 'color': 'blue', 'width': 4, 'name': 'Convex edges'},
-            'Concave': {'edges': [], 'color': 'red', 'width': 4, 'name': 'Concave edges'},
-            'Tangent': {'edges': [], 'color': 'green', 'width': 3, 'name': 'Tangent edges'},
-            'Unknown': {'edges': [], 'color': 'gray', 'width': 2, 'name': 'Unknown edges'}
+            'Convex': {
+                'edges': [],
+                'color': self.colors_rgb['edge_convex'],
+                'width': 4,
+                'name': 'Convex edges'
+            },
+            'Concave': {
+                'edges': [],
+                'color': self.colors_rgb['edge_concave'],
+                'width': 4,
+                'name': 'Concave edges'
+            },
+            'Tangent': {
+                'edges': [],
+                'color': self.colors_rgb['edge_tangent'],
+                'width': 3,
+                'name': 'Tangent edges'
+            },
+            'Unknown': {
+                'edges': [],
+                'color': (0.5, 0.5, 0.5),  # grey
+                'width': 2,
+                'name': 'Unknown edges'
+            }
         }
-        # Option: avoid duplicate edge lines (undirected)
+
         drawn_pairs = set()
         for edge in self.edge_data_list:
-            # faces_of_edge stores index pairs like (i, j)
             for pair in edge['faces_of_edge']:
                 i, j = pair
-                idx_pair = tuple(sorted([i, j]))
-                if idx_pair in drawn_pairs or i == j:
+                if i == j:
+                    continue
+                idx_pair = tuple(sorted((i, j)))
+                if idx_pair in drawn_pairs:
                     continue
                 drawn_pairs.add(idx_pair)
-                classification = edge['classification'][0] if edge['classification'] else 'Unknown'
+
+                # choose a classification string
+                classification = 'Unknown'
+                if edge['classification']:
+                    # pick first or change logic if needed
+                    classification = edge['classification'][0]
+
+                if hide_convex and classification == 'Convex':
+                    continue
+
                 group = edge_groups.get(classification, edge_groups['Unknown'])
                 group['edges'].append((i, j, edge))
 
@@ -273,28 +314,34 @@ class AAGBuilder_3D:
                     f"Length: {e_info['edge_length']:.2f}"
                 )
                 hover_text.extend([hover_label, hover_label, None])
+
+            r, g, b = group['color']
             fig.add_trace(go.Scatter3d(
                 x=x_line, y=y_line, z=z_line, mode='lines',
-                line=dict(color=group['color'], width=group['width']),
+                line=dict(
+                    color=f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})',
+                    width=group['width']
+                ),
                 name=f"{group['name']} ({len(group['edges'])})",
-                hovertemplate="%{text}<extra></extra>", text=hover_text
+                hovertemplate="%{text}<extra></extra>",
+                text=hover_text
             ))
 
-        # --- 4. Layout and show ---
         fig.update_layout(
-            title="AAG Graph from 3D Model",
+            title="AAG Graph from 3D Model" + (" (no convex edges)" if hide_convex else ""),
             scene=dict(
-                xaxis_title="X", yaxis_title="Y", zaxis_title="Z",
+                xaxis_title="X",
+                yaxis_title="Y",
+                zaxis_title="Z",
                 aspectmode="data",
                 camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
             ),
             legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-            width=1200, height=900
+            width=1200,
+            height=900
         )
         fig.show()
 
-        # --- Print basic stats ---
-        # Print number of faces per type, edge coverage, etc.
         print("\nFace type distribution:")
         for ftype, count in Counter(face_types).items():
             print(f"  {ftype}: {count}")
@@ -306,15 +353,7 @@ class AAGBuilder_3D:
             print(f"  {cls}: {count}")
         print(f"\nTotal faces: {len(self.face_data_list)}")
         print(f"Total mesh edges: {len(self.edge_data_list)}")
-        print(f"Graph/AAG links: {len(drawn_pairs)}")
-
-
-
-
-
-
-
-
+        print(f"Graph/AAG links (drawn pairs): {len(drawn_pairs)}")
 
 
 
