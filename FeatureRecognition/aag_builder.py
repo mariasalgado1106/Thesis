@@ -4,11 +4,83 @@ from geometry_analysis import (load_step_file, analyze_shape)
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
+from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+from OCC.Extend.TopologyUtils import TopologyExplorer
+from OCC.Core.TopLoc import TopLoc_Location
+from OCC.Core.BRep import BRep_Tool
+from OCC.Core.TopAbs import TopAbs_FORWARD
+import json
+
+
+#generate a triangulated mesh of the part for Plotly visualization
+def mesh_shape_for_visualization(shape, linear_deflection=0.1):
+    BRepMesh_IncrementalMesh(shape, linear_deflection)
+
+#extract a renderable triangle mesh from the B‑rep
+def extract_mesh_data(shape):
+    vertices = []
+    triangles = []
+    vertex_count = 0
+    topo = TopologyExplorer(shape)
+    for face in topo.faces():
+        loc = TopLoc_Location()
+        triangulation = BRep_Tool.Triangulation(face, loc)
+        if triangulation is None:
+            continue
+        transform = loc.Transformation()
+        face_vertices = []
+        for i in range(1, triangulation.NbNodes() + 1):
+            pnt = triangulation.Node(i)
+            pnt.Transform(transform)
+            vertices.append([pnt.X(), pnt.Y(), pnt.Z()])
+            face_vertices.append(vertex_count)
+            vertex_count += 1
+        for i in range(1, triangulation.NbTriangles() + 1):
+            triangle = triangulation.Triangle(i)
+            n1, n2, n3 = triangle.Get()
+            if face.Orientation() == TopAbs_FORWARD:
+                triangles.append([face_vertices[n1 - 1], face_vertices[n2 - 1], face_vertices[n3 - 1]])
+            else:
+                triangles.append([face_vertices[n1 - 1], face_vertices[n3 - 1], face_vertices[n2 - 1]])
+    return vertices, triangles
+
+#SAVE AS JSON FILE THE AAG RESULTS -> REMOVE IF I WON'T USE THIS
+def save_aag_results(my_shape, filename):
+    #change this
+
+
+
 
 class AAGBuilder_3D:
     def __init__(self, my_shape):
-        self.my_shape = my_shape
+        self.shape = my_shape
+        (self.all_faces, self.face_data_list, self.analyser, self.all_edges,
+         self.edge_data_list) = analyze_shape(self.shape)
 
+    def load_shape (self):
+        mesh_shape_for_visualization(self.shape, linear_deflection=0.1)
+        self.vertices, self.triangles = extract_mesh_data(self.shape)
+
+    def load_convexity_results(self):
+        self.edge_classification = {}
+        for edge_data in self.edge_data_list:
+            edge_idx = edge_data['index']
+            self.edge_classification[edge_idx] = {
+                'classification': edge_data['classification'],
+                'edge_geom': edge_data['edge_geom'],
+                'edge_length': edge_data['edge_length']
+            }
+        print(f"Loaded convexity results for {len(self.edge_data_list)} edges")
+
+
+
+
+
+
+
+
+
+########################################
 class AAGBuilder_2D:
     def __init__(self, my_shape):
         self.shape = my_shape

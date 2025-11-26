@@ -159,13 +159,35 @@ def analyze_shape(my_shape):
         adj_indices = [face_to_index_map[adj_f] for adj_f in adjacent_faces] #get the indices for the adj faces
         face_data["adjacent_indices"] = adj_indices
 
-    # Third pass: edge classification
-    all_edges = []
+    # Third pass: Edge extraction + deduplication
+
+    all_edges_raw = []  # store raw edges as given by OCC
     edge_explorer = TopExp_Explorer(my_shape, TopAbs_EDGE)
     while edge_explorer.More():
-        all_edges.append(TopoDS.Edge(edge_explorer.Current()))
+        all_edges_raw.append(TopoDS.Edge(edge_explorer.Current()))
         edge_explorer.Next()
 
+    print("\n--- Duplicate Edge Debug Check ---")
+    print(f"Total edges detected (raw OCC): {len(all_edges_raw)}")
+
+    # --- REMOVE DUPLICATE EDGES
+    unique_edges = []  # will hold only topologically unique edges
+    for e in all_edges_raw:
+        is_dup = False
+        for u in unique_edges:
+            if e.IsSame(u):
+                is_dup = True
+                break
+        if not is_dup:
+            unique_edges.append(e)
+
+    print(f"Unique edges (after IsSame filtering): {len(unique_edges)}")
+    print("------------------------------------------------------\n")
+
+    # Use deduplicated edges from now on
+    all_edges = unique_edges  # replace raw list with deduped list
+
+    # Build edge index map for unique edges
     edge_to_index_map = {edge: i for i, edge in enumerate(all_edges)}
     edge_data_list = []
 
@@ -180,16 +202,30 @@ def analyze_shape(my_shape):
         })
 
 
+    # Classify edges per face adjacency
     for face_data in face_data_list:
         face = face_data['face']
-        edges = t.edges_from_face(face)
-        for edge in edges:
-            edge_index = edge_to_index_map[edge]
-            edge_data = edge_data_list[edge_index]
-            adjacent_faces = [f for f in t.faces_from_edge(edge) if not f.IsSame(face)] #excludes actual afce
+        edges_of_face = t.edges_from_face(face)
+
+        for edge in edges_of_face:
+            # Match the face-local edge handle to our unique edge list using IsSame()
+            matched_index = None  # index in all_edges corresponding to this edge
+            for unique_edge in all_edges:
+                if edge.IsSame(unique_edge):
+                    matched_index = edge_to_index_map[unique_edge]
+                    break
+
+            if matched_index is None:
+                # skip if no matching unique edge found
+                continue
+
+            edge_data = edge_data_list[matched_index]
+
+            adjacent_faces = [f for f in t.faces_from_edge(edge) if not f.IsSame(face)]
             for adj_face in adjacent_faces:
                 edge_type = classify_edge_type(face, adj_face, edge, analyser)
                 edge_data['classification'].append(edge_type)
+
                 adj_index = face_to_index_map[adj_face]
                 if edge_type == "Convex":
                     face_data['convex_adjacent'].append(adj_index)
@@ -233,4 +269,36 @@ def print_edge_analysis_table(all_edges, edge_data_list):
 
     print("-------------------------------------------------------------------\n")
 
+
+if __name__ == "__main__":
+
+    step_path = r"C:\Users\Maria Salgado\PycharmProjects\Thesis\FeatureRecognition\STEPFiles\example_thoughhole.stp"
+    # <---- CHANGE THIS
+
+    shape = load_step_file(step_path)
+    if shape is None:
+        exit(1)
+
+    all_faces, face_data_list, analyser, all_edges, edge_data_list = analyze_shape(shape)
+
+    # -----------------------------------------------------------
+    # Verify that edges are truly unique
+    # -----------------------------------------------------------
+    print("\n--- Verification: Unique Edge Check in Main ---")
+    print(f"Edges returned by analyze_shape(): {len(all_edges)}")
+
+    dup_count = 0
+    for i in range(len(all_edges)):
+        for j in range(i + 1, len(all_edges)):
+            if all_edges[i].IsSame(all_edges[j]):
+                dup_count += 1
+
+    if dup_count == 0:
+        print("✓ No duplicate edges remain. Deduplication successful!")
+    else:
+        print(f"✗ WARNING: Found {dup_count} duplicates after analysis.")
+    print("-----------------------------------------------------------\n")
+
+    print_face_analysis_table(all_faces, face_data_list)
+    print_edge_analysis_table(all_edges, edge_data_list)
 
