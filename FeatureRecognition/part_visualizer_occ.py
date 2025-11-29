@@ -4,7 +4,7 @@ from OCC.Core.TopoDS import topods  # Import topods module
 from OCC.Display.OCCViewer import rgb_color
 
 
-class PartVisualizer:
+class PartVisualizer_occ:
     def __init__(self, builder, recognizer):
         self.builder = builder
         self.recognizer = recognizer

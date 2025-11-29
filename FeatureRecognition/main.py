@@ -3,7 +3,8 @@ from OCC.Display.SimpleGui import init_display
 from geometry_analysis import (load_step_file, analyze_shape, print_face_analysis_table, print_edge_analysis_table)
 from aag_builder import AAGBuilder_2D, AAGBuilder_3D
 from feature_recognition import FeatureRecognizer
-from part_visualizer_occ import PartVisualizer
+from part_visualizer_occ import PartVisualizer_occ
+from part_vizualizer_plotly import Part_Visualizer
 
 
 def main():
@@ -51,14 +52,17 @@ def main():
         "[0/1/2/3/4/5/6]: "
     )
 
-    viz = PartVisualizer(builder2D, recognizer)
+    viz_occ = PartVisualizer_occ(builder2D, recognizer)
+    viz = Part_Visualizer(builder3D)
 
     if choice == "0":
-        builder3D.visualize_numbered_faces()
-    #'''
+        #builder3D.visualize_numbered_faces()
+        viz.visualize_numbered_faces()
+
     if choice in ["1", "3"]:
-        viz.display_base_shape(display, transparency=0.6)
-        viz.visualize_edges(display)#'''
+        viz.visualize_geometric_edges()
+        '''viz.display_base_shape(display, transparency=0.6)
+        viz.visualize_edges(display)'''
 
     # if choice in ["2", "3"]:
     #     viz.display_base_shape(display, transparency=0.0)

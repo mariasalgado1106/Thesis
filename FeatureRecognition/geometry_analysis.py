@@ -126,7 +126,7 @@ def get_edge_info(edge):
     for j in range(len(points) - 1):
         edge_length += np.linalg.norm(points[j + 1] - points[j])
 
-    return edge_geom, edge_length
+    return edge_geom, edge_length, points
 
 
 
@@ -202,12 +202,13 @@ def analyze_shape(my_shape):
     edge_data_list = []
 
     for i, edge in enumerate(all_edges):
-        edge_geom, edge_length = get_edge_info(edge)
+        edge_geom, edge_length, points = get_edge_info(edge)
         edge_data_list.append({
             "index": i,
             "edge": edge,
             "edge_geom": edge_geom,
             "edge_length": edge_length,
+            "points": points,  # Nx3 array
             "faces_of_edge" : [],
             "classification": []
         })
