@@ -11,7 +11,7 @@ def main():
     display, start_display, add_menu, add_function_to_menu = init_display()
 
     # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "Part3.stp"))
+    my_shape = load_step_file(os.path.join("STEPFiles", "example_thoughhole.stp"))
     if not my_shape:
         return
 
@@ -30,10 +30,10 @@ def main():
     builder3D = AAGBuilder_3D(my_shape)
     builder3D.load_shape()
 
-    # PART 3: Feature Recognition
+    '''# PART 3: Feature Recognition
     print("\n PART 3: FEATURE RECOGNITION")
     recognizer = FeatureRecognizer(subgraphs_info)
-    features = recognizer.recognize_all_features()
+    features = recognizer.recognize_all_features()'''
     '''
     # Print statistics --> feature count'''
 
@@ -41,20 +41,24 @@ def main():
     print("\n VISUALIZATION")
     choice = input(
         "Visualize: "
+        "(0) Numbered Faces,"
         "(1) Edge Types, "
         "(2) Features, "
         "(3) Both, "
         "(4) 2D AAG + Subgraphs, "
         "(5) 3D AAG, "
         "(6) 3D AAG without convex edges "
-        "[1/2/3/4/5/6]: "
+        "[0/1/2/3/4/5/6]: "
     )
 
-    viz = PartVisualizer(builder2D, recognizer)
+    #viz = PartVisualizer(builder2D, recognizer)
 
+    if choice == "0":
+        builder3D.visualize_numbered_faces()
+    '''
     if choice in ["1", "3"]:
         viz.display_base_shape(display, transparency=0.6)
-        viz.visualize_edges(display)
+        viz.visualize_edges(display)'''
 
     # if choice in ["2", "3"]:
     #     viz.display_base_shape(display, transparency=0.0)

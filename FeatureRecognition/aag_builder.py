@@ -124,9 +124,9 @@ class AAGBuilder_3D:
             "feat_other": (1.0, 0.2, 0.1),  # Light Orange
 
             # GEOMETRY
-            "geo_plane": (0.96, 0.96, 0.96),  # Light Grey
-            "geo_cylinder": (1.0, 0.98, 0.8),  # Pale Yellow
-            "geo_other": (0.98, 0.94, 0.90),  # Beige
+            "geo_plane": (0.75, 0.75, 0.75),  # Light Grey
+            "geo_cylinder": (0.94, 0.98, 0.72),  # Pale Yellow
+            "geo_other": (0.4, 0.4, 0.4),  # Darker Gray
         }
 
     def load_shape (self):
@@ -214,36 +214,40 @@ class AAGBuilder_3D:
         centers = [f['face_center'] for f in self.face_data_list]
 
         face_colors = {
-            'Plane': 'blue',
-            'Cylinder': 'red',
-            'Cone': 'orange',
-            'Sphere': 'green',
-            'Torus': 'purple',
-            'Other': 'brown',
-            'Unknown': 'gray'
+            'Plane': self.colors_rgb['geo_plane'],
+            'Cylinder': self.colors_rgb['geo_cylinder'],
+            'Other': self.colors_rgb['geo_other']
         }
 
-        unique_types = set(face_types)
-        for ftype in unique_types:
-            indices = [i for i, ft in enumerate(face_types) if ft == ftype]
+        # one trace per type
+        for ftype in sorted(set(face_types)):
+            indices = [f['index'] for f in self.face_data_list if f['type'] == ftype]
             if not indices:
                 continue
+
             xs = [centers[i][0] for i in indices]
             ys = [centers[i][1] for i in indices]
             zs = [centers[i][2] for i in indices]
+
+            r, g, b = face_colors.get(ftype, (0.5, 0.5, 0.5))
+            color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
             fig.add_trace(go.Scatter3d(
-                x=xs, y=ys, z=zs, mode='markers+text',
+                x=xs, y=ys, z=zs,
+                mode='markers+text',
                 marker=dict(
                     size=node_size,
-                    color=face_colors.get(ftype, 'gray'),
+                    color=color_str,
                     line=dict(width=2, color='black')
                 ),
                 text=[str(i) for i in indices],
                 textposition='middle center',
                 textfont=dict(size=8, color='white'),
                 name=f'{ftype} faces ({len(indices)})',
-                hovertemplate="Face %{text}<br>Type: " + ftype +
-                              "<br>Center: (%{x:.2f}, %{y:.2f}, %{z:.2f})<extra></extra>"
+                hovertemplate=(
+                        "Face %{text}<br>Type: " + ftype +
+                        "<br>Center: (%{x:.2f}, %{y:.2f}, %{z:.2f})<extra></extra>"
+                )
             ))
 
         # 3. Edge links / AAG edges using self.colors_rgb
@@ -354,6 +358,92 @@ class AAGBuilder_3D:
         print(f"\nTotal faces: {len(self.face_data_list)}")
         print(f"Total mesh edges: {len(self.edge_data_list)}")
         print(f"Graph/AAG links (drawn pairs): {len(drawn_pairs)}")
+
+
+
+    def visualize_numbered_faces(self, node_size=10, title="Numbered faces"):
+        import plotly.graph_objects as go
+
+        face_idx = [f['index'] for f in self.face_data_list]
+        face_types = [f['type'] for f in self.face_data_list]
+        centers = [f['face_center'] for f in self.face_data_list]
+
+        face_colors = {
+            'Plane': self.colors_rgb['geo_plane'],
+            'Cylinder': self.colors_rgb['geo_cylinder'],
+            'Other': self.colors_rgb['geo_other']
+        }
+
+        fig = go.Figure()
+
+        if hasattr(self, "vertices") and hasattr(self, "triangles"):
+            fig.add_trace(go.Mesh3d(
+                x=[v[0] for v in self.vertices],
+                y=[v[1] for v in self.vertices],
+                z=[v[2] for v in self.vertices],
+                i=[t[0] for t in self.triangles],
+                j=[t[1] for t in self.triangles],
+                k=[t[2] for t in self.triangles],
+                color='lightblue',
+                opacity=0.2,
+                name='3D Model',
+                flatshading=True,
+            ))
+
+        # one trace per type
+        for ftype in sorted(set(face_types)):
+            indices = [f['index'] for f in self.face_data_list if f['type'] == ftype]
+
+            if not indices:
+                continue
+
+            xs = [centers[i][0] for i in indices]
+            ys = [centers[i][1] for i in indices]
+            zs = [centers[i][2] for i in indices]
+
+            r, g, b = face_colors.get(ftype, (0.5, 0.5, 0.5))
+            color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
+            fig.add_trace(go.Scatter3d(
+                x=xs, y=ys, z=zs,
+                mode='markers+text',
+                marker=dict(
+                    size=node_size,
+                    color=color_str,
+                    line=dict(width=2, color='black')
+                ),
+                text=[str(i) for i in indices],
+                textposition='middle center',
+                textfont=dict(size=8, color='white'),
+                name=f'{ftype} faces ({len(indices)})',
+                hovertemplate=(
+                        "Face %{text}<br>Type: " + ftype +
+                        "<br>Center: (%{x:.2f}, %{y:.2f}, %{z:.2f})<extra></extra>"
+                )
+            ))
+
+        fig.update_layout(
+            title=title,
+            scene=dict(
+                xaxis_title="X",
+                yaxis_title="Y",
+                zaxis_title="Z",
+                aspectmode="data",
+                camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
+            ),
+            legend=dict(
+                yanchor="top", y=0.99,
+                xanchor="left", x=0.01
+            ),
+            width=900,
+            height=700
+        )
+        fig.show()
+
+
+
+
+
 
 
 
