@@ -60,5 +60,7 @@ class PartVisualizer:
             draw_edges(face_data["concave_adjacent"], "edge_concave")
             draw_edges(face_data["tangent_adjacent"], "edge_tangent")
 
+
+
         print(f"\nTotal edges displayed: {len(processed_edges)}")
         display.FitAll()

@@ -242,7 +242,7 @@ class AAGBuilder_3D:
                 ),
                 text=[str(i) for i in indices],
                 textposition='middle center',
-                textfont=dict(size=8, color='white'),
+                textfont=dict(size=8, color='black'),
                 name=f'{ftype} faces ({len(indices)})',
                 hovertemplate=(
                         "Face %{text}<br>Type: " + ftype +
@@ -414,7 +414,7 @@ class AAGBuilder_3D:
                 ),
                 text=[str(i) for i in indices],
                 textposition='middle center',
-                textfont=dict(size=8, color='white'),
+                textfont=dict(size=8, color='black'),
                 name=f'{ftype} faces ({len(indices)})',
                 hovertemplate=(
                         "Face %{text}<br>Type: " + ftype +
@@ -439,7 +439,6 @@ class AAGBuilder_3D:
             height=700
         )
         fig.show()
-
 
 
 
