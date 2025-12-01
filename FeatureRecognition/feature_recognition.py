@@ -1,5 +1,11 @@
 from typing import List, Dict, Any
-from aag_builder import AAGBuilder_2D
+from aag_builder import AAGBuilder_2D, AAGBuilder_3D
+
+class FeatureRecognition_OpenCV:
+    def __init__(self):
+        self.aag = AAGBuilder_3D()
+
+
 
 class FeatureRecognizer:
     def __init__(self, subgraphs_info):

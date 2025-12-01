@@ -94,11 +94,6 @@ def extract_mesh_data(shape):
                 triangles.append([face_vertices[n1 - 1], face_vertices[n3 - 1], face_vertices[n2 - 1]])
     return vertices, triangles
 
-#SAVE AS JSON FILE THE AAG RESULTS -> REMOVE IF I WON'T USE THIS
-'''def save_aag_results(my_shape, filename):
-    #change this'''
-
-
 
 
 class AAGBuilder_3D:
