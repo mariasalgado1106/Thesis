@@ -21,6 +21,11 @@ from OCC.Core.GeomAbs import (GeomAbs_Plane, GeomAbs_Cylinder,
 from OCC.Core.GProp import GProp_GProps
 from OCC.Core.BRepGProp import brepgprop
 
+from OCC.Core.Bnd import Bnd_Box
+from OCC.Core.BRepBndLib import brepbndlib
+
+from OCC.Core.gp import gp_Pnt, gp_Vec
+
 
 
 def load_step_file(step_file):
@@ -39,13 +44,20 @@ def load_step_file(step_file):
         print("ERROR: Could not read STEP file.")
         return None
 
-def get_stock_box (shape):
-    stock_box = shape.BoundingBox() #CHECK THIS!!!!!!!!!!!!!!!!
 
+def get_stock_box(shape, tol=1e-6):
+    bbox = Bnd_Box()
+    bbox.SetGap(tol)  # small tolerance to avoid precision issues
+    brepbndlib.Add(shape, bbox)  # Add shape to bounding box
+    xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
+    cx = 0.5 * (xmin + xmax)
+    cy = 0.5 * (ymin + ymax)
+    cz = 0.5 * (zmin + zmax)
+    stock_box_center = gp_Pnt(cx, cy, cz)
+    return xmin, ymin, zmin, xmax, ymax, zmax, stock_box_center
 
 
 def get_face_geometry(face):
-
     adaptor = BRepAdaptor_Surface(face, True) #adapts a face so it can be treated as a surface
     face_type = adaptor.GetType()
     if face_type == GeomAbs_Cylinder:
@@ -55,8 +67,82 @@ def get_face_geometry(face):
     else:
         return "Other", None
 
+def define_stock_face (face, shape, tol=1e-3):
+    face_type, _ = get_face_geometry(face)
+    xmin, ymin, zmin, xmax, ymax, zmax, stock_box_center = get_stock_box(shape, 1e-6)
+    face_center_coords, _ = get_face_center(face)
+    x, y, z = face_center_coords
+    if face_type != "Plane":
+        return "No"
+
+    face_xmin = abs(x - xmin) <= tol
+    face_xmax = abs(x - xmax) <= tol
+    face_ymin = abs(y - ymin) <= tol
+    face_ymax = abs(y - ymax) <= tol
+    face_zmin = abs(z - zmin) <= tol
+    face_zmax = abs(z - zmax) <= tol
+
+    if face_xmin or face_xmax or face_ymin or face_ymax or face_zmin or face_zmax:
+        return "Yes"
+    else:
+        return "No"
+
+def normal_vector_face (face, shape):
+    _, _, _, _, _, _, stock_box_center = get_stock_box(shape, 1e-6)
+    _, face_center = get_face_center(face)
+
+    surf = BRepAdaptor_Surface(face, True)
+    umin, umax = surf.FirstUParameter(), surf.LastUParameter()
+    vmin, vmax = surf.FirstVParameter(), surf.LastVParameter()
+    u = 0.5 * (umin + umax)
+    v = 0.5 * (vmin + vmax)
+
+    p = gp_Pnt()
+    d1u = gp_Vec()
+    d1v = gp_Vec()
+    surf.D1(u, v, p, d1u, d1v) #this gives values to p, d1u and d1v
+
+    n = d1u.Crossed(d1v)
+    if n.Magnitude() == 0:
+        return 0.0, 0.0, 0.0
+    n.Normalize()
+
+    # direction vector from face_center to stock center
+    vv = gp_Vec(stock_box_center.XYZ() - face_center.XYZ())
+
+    #normal to be consistent toward box center
+    if n.Dot(vv) < 0:
+        n = gp_Vec(-n.X(), -n.Y(), -n.Z())
+
+    n_coords = ([n.X(), n.Y(), n.Z()])
+
+    def normal_axis_direction(n_coords, tol=1e-3):
+        nx, ny, nz = n_coords
+        if abs(nx - 1.0) < tol and abs(ny) < tol and abs(nz) < tol:
+            return "x"
+        elif abs(nx + 1.0) < tol and abs(ny) < tol and abs(nz) < tol:
+            return "-x"
+        elif abs(ny - 1.0) < tol and abs(nx) < tol and abs(nz) < tol:
+            return "y"
+        elif abs(ny + 1.0) < tol and abs(nx) < tol and abs(nz) < tol:
+            return "-y"
+        elif abs(nz - 1.0) < tol and abs(nx) < tol and abs(ny) < tol:
+            return "z"
+        elif abs(nz + 1.0) < tol and abs(nx) < tol and abs(ny) < tol:
+            return "-z"
+        else:
+            return "No axis"
+
+    n_axis = normal_axis_direction(n_coords, tol=1e-3)
+    return n, n_coords, n_axis
 
 
+def get_face_center (face):
+    props = GProp_GProps()
+    brepgprop.SurfaceProperties(face, props)
+    center = props.CentreOfMass()
+    face_center_coords = ([center.X(), center.Y(), center.Z()])
+    return face_center_coords, center
 
 def get_adjacent_faces(shape, target_face):
     adjacent_faces = set()
@@ -146,20 +232,23 @@ def analyze_shape(my_shape):
     # First pass: geometry types
     for i, face in enumerate(all_faces):
         face_type, geometry = get_face_geometry(face)
-        props = GProp_GProps()
-        brepgprop.SurfaceProperties(face, props)
-        center = props.CentreOfMass()
-        face_center = ([center.X(), center.Y(), center.Z()])
+        face_center, _ = get_face_center(face)
+        stock_face = define_stock_face(face, my_shape,1e-3)
+        n, n_coords, n_axis = normal_vector_face(face, my_shape)
         face_data_list.append({
             "index": i,
             "face": face,
             "type": face_type,
             "geom": geometry,
             "face_center": face_center,
+            "stock_face": stock_face,
             "adjacent_indices": [],
             "convex_adjacent" : [],
             "concave_adjacent" : [],
-            "tangent_adjacent" : []
+            "tangent_adjacent" : [],
+            "normal_vector": n,
+            "normal_vector_coords": n_coords,
+            "normal_vector_axis": n_axis
         })
 
 
@@ -254,12 +343,14 @@ def print_face_analysis_table(all_faces, face_data_list):
     print("\n--- Model Face Analysis Table ---")
     print(f"Total faces found: {len(all_faces)}")
     print("-------------------------------------------------------------------")
-    print(f"{'Face #':<6} | {'Type':<10} | {'Adjacent':<15} | {'Convex':<15} | {'Concave':<15} | {'Tangent'}")
+    print(f"{'Face #':<3} | {'Type':<8} |{'Stock Face':<10} | {'Normal':<6} | {'Adjacent':<15} | {'Convex':<15} | {'Concave':<15} | {'Tangent'}")
     print("-" * 95)
 
     for face_data in face_data_list:
-        print(f"{face_data['index']:<6} | "
+        print(f"{face_data['index']:<3} | "
               f"{face_data['type']:<10} | "
+              f"{face_data['stock_face']:<10} | "
+              f"{face_data['normal_vector_axis']:<6} | "
               f"{str(face_data['adjacent_indices']):<15} | "
               f"{str(face_data['convex_adjacent']):<15} | "
               f"{str(face_data['concave_adjacent']):<15} | "
