@@ -3,6 +3,7 @@ from collections import defaultdict, Counter
 
 import numpy as np
 import matplotlib.pyplot as plt
+from jinja2.nodes import Continue
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 import plotly.graph_objects as go
@@ -207,6 +208,7 @@ class AAGBuilder_3D:
         # 2. Face centers colored by face type
         face_types = [f['type'] for f in self.face_data_list]
         centers = [f['face_center'] for f in self.face_data_list]
+        stock_face = [f['stock_face'] for f in self.face_data_list]
 
         face_colors = {
             'Plane': self.colors_rgb['geo_plane'],
@@ -216,7 +218,18 @@ class AAGBuilder_3D:
 
         # one trace per type
         for ftype in sorted(set(face_types)):
-            indices = [f['index'] for f in self.face_data_list if f['type'] == ftype]
+
+            if hide_convex:
+                # keep only non‑stock faces
+                indices = [
+                    f['index']
+                    for f in self.face_data_list
+                    if f['type'] == ftype and f['stock_face'] != "Yes"
+                ]
+            else:
+                indices = [f['index'] for f in self.face_data_list if f['type'] == ftype]
+
+
             if not indices:
                 continue
 
@@ -226,6 +239,7 @@ class AAGBuilder_3D:
 
             r, g, b = face_colors.get(ftype, (0.5, 0.5, 0.5))
             color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
 
             fig.add_trace(go.Scatter3d(
                 x=xs, y=ys, z=zs,
@@ -327,7 +341,7 @@ class AAGBuilder_3D:
             ))
 
         fig.update_layout(
-            title="AAG Graph from 3D Model" + (" (no convex edges)" if hide_convex else ""),
+            title="AAG Graph from 3D Model" + (" (no convex edges and stock faces)" if hide_convex else ""),
             scene=dict(
                 xaxis_title="X",
                 yaxis_title="Y",
@@ -403,7 +417,7 @@ class AAGBuilder_2D:
         for face_data in self.face_data_list:
             i = face_data["index"]
             self.G.add_node(i, face_type=face_data["type"], geometry=face_data["geom"],
-                       adjacent_faces=face_data["adjacent_indices"])
+                       adjacent_faces=face_data["adjacent_indices"], stock_face=face_data["stock_face"])
 
         # Add ALL edge types
         for face_data in self.face_data_list:
@@ -439,9 +453,12 @@ class AAGBuilder_2D:
     def build_aag_subgraph (self):
         if self.G is None:
             self.build_aag_graph()
+        def filter_stock_faces (node):
+            self.newG = self.G._node[node].get("stock_face") != "Yes"
+            return self.newG
         def filter_edge(n1, n2): #n1 and n2 are the 2 nodes
             return self.G[n1][n2].get("edge_type") != "convex" #if convex it returns false and removes
-        self.subG = nx.subgraph_view(self.G, filter_edge=filter_edge)
+        self.subG = nx.subgraph_view(self.G, filter_node=filter_stock_faces, filter_edge=filter_edge)
 
         return self.subG
 
@@ -555,7 +572,7 @@ class AAGBuilder_2D:
             Patch(facecolor='none', edgecolor=self.colors_rgb['feat_pocket_through'], linewidth=3, label='Through Pocket'),
             Patch(facecolor='none', edgecolor=self.colors_rgb['feat_pocket_blind'], linewidth=3, label='Blind Pocket')
         ]
-        ax2.legend(handles=legend_elements, loc='lower right', fontsize=8, frameon=True)
+        ax2.legend(handles=legend_elements, loc='upper left', fontsize=8, frameon=True)
 
         for ax in (ax1, ax2):
             ax.axis('off')
