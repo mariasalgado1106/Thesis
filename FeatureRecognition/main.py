@@ -2,7 +2,7 @@ import os
 from OCC.Display.SimpleGui import init_display
 from geometry_analysis import (load_step_file, analyze_shape, print_face_analysis_table, print_edge_analysis_table)
 from aag_builder import AAGBuilder_2D, AAGBuilder_3D
-from feature_recognition import FeatureRecognizer
+from feature_recognition import FeatureRecognition
 from part_visualizer_occ import PartVisualizer_occ
 from part_vizualizer_plotly import Part_Visualizer
 
@@ -32,11 +32,14 @@ def main():
     builder3D.load_shape()
 
     # PART 3: Feature Recognition
-    print("\n PART 3: FEATURE RECOGNITION")
-    recognizer = FeatureRecognizer(subgraphs_info)
-    features = recognizer.recognize_all_features()
-    '''
-    # Print statistics --> feature count'''
+    print("\nPART 3: FEATURE RECOGNITION")
+    recognizer = FeatureRecognition(my_shape)
+    features = recognizer.identify_features()
+
+    # stats
+    print(f"Detected {len(features)} features")
+    for f in features:
+        print(f["feature_type"], f["node_indices"])
 
     # Visualize results
     print("\n VISUALIZATION")
@@ -64,9 +67,8 @@ def main():
         '''viz.display_base_shape(display, transparency=0.6)
         viz.visualize_edges(display)'''
 
-    # if choice in ["2", "3"]:
-    #     viz.display_base_shape(display, transparency=0.0)
-    #     viz.visualize_features(display)
+    if choice in ["2", "3"]:
+        recognizer.visualize_features_3d()
 
     if choice == "4":
         builder2D.visualize_2d_aag()
