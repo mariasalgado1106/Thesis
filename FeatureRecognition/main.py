@@ -61,13 +61,22 @@ def main():
         #builder3D.visualize_numbered_faces()
         viz.visualize_numbered_faces()
 
-    if choice in ["1", "3"]:
+    if choice in ["1"]:
         viz.visualize_geometric_edges()
-        '''viz.display_base_shape(display, transparency=0.6)
-        viz.visualize_edges(display)'''
 
-    if choice in ["2", "3"]:
-        recognizer.visualize_features_3d()
+    if choice in ["2"]: #dont show faces or edges
+        recognizer.visualize_features_3d(
+            show_mesh=True,
+            show_face_centers=False,
+            show_edges=False
+        )
+
+    if choice in ["3"]: #show faces & edges
+        recognizer.visualize_features_3d(
+            show_mesh=True,
+            show_face_centers=True,
+            show_edges=True
+        )
 
     if choice == "4":
         builder2D.visualize_2d_aag()
