@@ -216,6 +216,7 @@ def get_edge_info(edge):
 
 
 
+
 def analyze_shape(my_shape):
     analyser = BRepOffset_Analyse(my_shape, 0.01) #make sre it considers right normals
     t = TopologyExplorer(my_shape)

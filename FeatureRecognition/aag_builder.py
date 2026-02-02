@@ -453,33 +453,50 @@ class AAGBuilder_2D:
     def build_aag_subgraph (self):
         if self.G is None:
             self.build_aag_graph()
-        def filter_stock_faces (node):
-            self.newG = self.G._node[node].get("stock_face") != "Yes"
-            return self.newG
+        def filter_stock_faces(node):
+            return self.G.nodes[node].get("stock_face") != "Yes"
         def filter_edge(n1, n2): #n1 and n2 are the 2 nodes
             return self.G[n1][n2].get("edge_type") != "convex" #if convex it returns false and removes
         self.subG = nx.subgraph_view(self.G, filter_node=filter_stock_faces, filter_edge=filter_edge)
+        #this only created the view of the graph, not actually removing those nodes
+
+        #make sure planar faces by themselves are removed
+        nodes_to_keep = set()
+        for component in nx.connected_components(self.subG):
+            sg = self.subG.subgraph(component)
+            # Keep if: has edges OR is a cylinder (potential through-hole)
+            if sg.number_of_edges() > 0:
+                nodes_to_keep.update(component)
+            else:
+                # Single isolated node - only keep if it's a cylinder
+                node = list(component)[0]
+                if self.G.nodes[node].get('face_type') == 'Cylinder':
+                    nodes_to_keep.add(node)
+
+        # Create final filtered subgraph
+        self.subG = self.subG.subgraph(nodes_to_keep).copy()
 
         return self.subG
 
     # 2. ANALYSE SUBGRAPH FOR FR (connected faces)
 
-    def analyse_subgraphs (self):
+    def analyse_subgraphs(self):
         if self.subG is None:
             self.build_aag_subgraph()
-        subgraphs = list(nx.connected_components(self.subG)) #the subgraphs/components
+        subgraphs = list(nx.connected_components(self.subG))
         self.subgraphs_info = []
 
-        for i, nodeset in enumerate(subgraphs): #i=nr of the component/subgraph
-            sg = self.subG.subgraph(nodeset)
+        for i, nodeset in enumerate(subgraphs):
+            sg = self.subG.subgraph(nodeset).copy()
             nodes = list(sg.nodes())
             n_faces = len(nodes)
             face_types = [self.face_data_list[node]['type'] for node in nodes]
-            n_concave = sum(1 for _, _, type in sg.edges(data=True) if type.get('edge_type') == 'concave')
+            n_concave = sum(1 for _, _, data in sg.edges(data=True) if data.get('edge_type') == 'concave')
             print(f"Subgraph {i}: faces={n_faces}, concave_edges={n_concave}")
 
             self.subgraphs_info.append({
                 'subgraph_idx': i,
+                'subgraph': sg,  # the actual graph object
                 'nodes': nodes,
                 'n_faces': n_faces,
                 'n_concave': n_concave,
