@@ -26,6 +26,10 @@ from OCC.Core.BRepBndLib import brepbndlib
 
 from OCC.Core.gp import gp_Pnt, gp_Vec
 
+from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+from OCC.Core.TopLoc import TopLoc_Location
+from OCC.Core.BRep import BRep_Tool
+
 
 
 def load_step_file(step_file):
@@ -159,6 +163,42 @@ def get_adjacent_faces(shape, target_face):
     return list(adjacent_faces)
 
 
+def triangulate_face(face, linear_deflection=0.1):
+    #Triangulate a face and return vertices and triangles
+
+    location = TopLoc_Location()
+    triangulation = BRep_Tool.Triangulation(face, location)
+
+    if triangulation is None:
+        return [], []
+
+    transformation = location.Transformation()
+
+    # vertices
+    vertices = []
+    for i in range(1, triangulation.NbNodes() + 1):
+        pnt = triangulation.Node(i)
+        pnt.Transform(transformation)
+        vertices.append([pnt.X(), pnt.Y(), pnt.Z()])
+
+    # triangles (convert to 0-based indexing)
+    triangles = []
+    for i in range(1, triangulation.NbTriangles() + 1):
+        triangle = triangulation.Triangle(i)
+        n1, n2, n3 = triangle.Get()
+        triangles.append([n1 - 1, n2 - 1, n3 - 1])
+
+    return vertices, triangles
+
+
+def triangulate_shape(shape, linear_deflection=0.1):
+    #Triangulate the entire shape before extracting face meshes
+    #Call this once at the beginning
+
+    mesher = BRepMesh_IncrementalMesh(shape, linear_deflection)
+    mesher.Perform()
+    if not mesher.IsDone():
+        print("Warning: Meshing may be incomplete")
 
 
 def classify_edge_type(face1, face2, shared_edge, analyser):
@@ -218,6 +258,9 @@ def get_edge_info(edge):
 
 
 def analyze_shape(my_shape):
+    # First, triangulate the entire shape
+    linear_deflection = 0.1
+    triangulate_shape(my_shape, linear_deflection)
     analyser = BRepOffset_Analyse(my_shape, 0.01) #make sre it considers right normals
     t = TopologyExplorer(my_shape)
 
@@ -236,6 +279,7 @@ def analyze_shape(my_shape):
         face_center, _ = get_face_center(face)
         stock_face = define_stock_face(face, my_shape,1e-3)
         n, n_coords, n_axis = normal_vector_face(face, my_shape)
+        vertices, triangles = triangulate_face(face, linear_deflection) #mesh triangulation
         face_data_list.append({
             "index": i,
             "face": face,
@@ -249,7 +293,9 @@ def analyze_shape(my_shape):
             "tangent_adjacent" : [],
             "normal_vector": n,
             "normal_vector_coords": n_coords,
-            "normal_vector_axis": n_axis
+            "normal_vector_axis": n_axis,
+            "mesh_vertices": vertices,
+            "mesh_triangles": triangles
         })
 
 

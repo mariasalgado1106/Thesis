@@ -2,6 +2,7 @@ from typing import Dict, List, Tuple
 import networkx as nx
 import plotly.graph_objects as go
 from aag_builder import AAGBuilder_2D, AAGBuilder_3D
+from geometry_analysis import load_step_file, analyze_shape
 
 
 class FeatureLibrary:
@@ -50,6 +51,9 @@ class FeatureRecognition:
         self.aag = AAGBuilder_2D(my_shape)
         self.subgraphs_info = self.aag.analyse_subgraphs()
         self.colors_rgb = self.aag.colors_rgb
+        self.shape = my_shape
+        (self.all_faces, self.face_data_list, self.analyser, self.all_edges,
+         self.edge_data_list) = analyze_shape(self.shape)
 
         # library
         self.lib = FeatureLibrary()
@@ -98,162 +102,202 @@ class FeatureRecognition:
 
         return self.matches
 
-
-    def visualize_3d_feat(self, show_mesh=True, mesh_opacity=0.2, node_size=10):
+    def visualize_features_3d(self, show_mesh=True, mesh_opacity=0.7, node_size=10,
+                                  show_face_centers=True, show_edges=True):
         import plotly.graph_objects as go
-        from collections import Counter
+        import numpy as np
 
         fig = go.Figure()
 
-        # 1. Mesh visualization
-        if hasattr(self, "vertices") and hasattr(self, "triangles") and show_mesh:
-            fig.add_trace(go.Mesh3d(
-                x=[v[0] for v in self.vertices],
-                y=[v[1] for v in self.vertices],
-                z=[v[2] for v in self.vertices],
-                i=[t[0] for t in self.triangles],
-                j=[t[1] for t in self.triangles],
-                k=[t[2] for t in self.triangles],
-                color='lightblue',
-                opacity=mesh_opacity,
-                name='3D Model',
-                flatshading=True,
-            ))
+        # Create a mapping: face_index -> feature info
+        face_to_feature = {}
+        for match in self.matches:
+            feature_type = match['feature_type']
+            for face_idx in match['node_indices']:
+                face_to_feature[face_idx] = feature_type
 
-        # 2. Face centers colored by face type
-        face_types = [f['type'] for f in self.face_data_list]
-        centers = [f['face_center'] for f in self.face_data_list]
-        stock_face = [f['stock_face'] for f in self.face_data_list]
+        # Define feature colors
+        feature_colors = self.colors_rgb
 
-        face_colors = {
-            'Plane': self.colors_rgb['geo_plane'],
-            'Cylinder': self.colors_rgb['geo_cylinder'],
-            'Other': self.colors_rgb['geo_other']
-        }
+        # 1. Visualize face meshes colored by feature
+        if show_mesh:
+            # Group faces by feature type
+            feature_groups = {}
+            for face_data in self.face_data_list:
+                face_idx = face_data['index']
 
-        # one trace per type
-        for ftype in sorted(set(face_types)):
-            indices = [ #only non-stock faces
-                    f['index']
-                    for f in self.face_data_list
-                    if f['type'] == ftype and f['stock_face'] != "Yes"
-                ]
-            if not indices:
-                continue
+                # Skip stock faces
+                if face_data['stock_face'] == 'Yes':
+                    continue
 
-            xs = [centers[i][0] for i in indices]
-            ys = [centers[i][1] for i in indices]
-            zs = [centers[i][2] for i in indices]
+                # Determine feature membership
+                if face_idx in face_to_feature:
+                    feature = face_to_feature[face_idx]
+                else:
+                    feature = 'unrecognized'
 
-            r, g, b = face_colors.get(ftype, (0.5, 0.5, 0.5))
-            color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+                if feature not in feature_groups:
+                    feature_groups[feature] = []
+                feature_groups[feature].append(face_data)
 
+            # Create one mesh trace per feature type
+            for feature, faces in feature_groups.items():
+                # Collect all vertices and triangles for this feature
+                all_vertices = []
+                all_triangles = []
+                vertex_offset = 0
 
-            fig.add_trace(go.Scatter3d(
-                x=xs, y=ys, z=zs,
-                mode='markers+text',
-                marker=dict(
-                    size=node_size,
+                for face_data in faces:
+                    vertices = face_data.get('mesh_vertices', [])
+                    triangles = face_data.get('mesh_triangles', [])
+
+                    if not vertices or not triangles:
+                        continue
+
+                    # Add vertices
+                    all_vertices.extend(vertices)
+
+                    # Add triangles with offset
+                    for tri in triangles:
+                        all_triangles.append([
+                            tri[0] + vertex_offset,
+                            tri[1] + vertex_offset,
+                            tri[2] + vertex_offset
+                        ])
+
+                    vertex_offset += len(vertices)
+
+                if not all_vertices:
+                    continue
+
+                # Get color for this feature
+                r, g, b = feature_colors.get(feature, (0.7, 0.7, 0.7))
+                color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
+                # Create mesh trace
+                fig.add_trace(go.Mesh3d(
+                    x=[v[0] for v in all_vertices],
+                    y=[v[1] for v in all_vertices],
+                    z=[v[2] for v in all_vertices],
+                    i=[t[0] for t in all_triangles],
+                    j=[t[1] for t in all_triangles],
+                    k=[t[2] for t in all_triangles],
                     color=color_str,
-                    line=dict(width=2, color='black')
-                ),
-                text=[str(i) for i in indices],
-                textposition='middle center',
-                textfont=dict(size=8, color='black'),
-                name=f'{ftype} faces ({len(indices)})',
-                hovertemplate=(
-                        "Face %{text}<br>Type: " + ftype +
-                        "<br>Center: (%{x:.2f}, %{y:.2f}, %{z:.2f})<extra></extra>"
-                )
-            ))
+                    opacity=mesh_opacity,
+                    name=f'{feature} ({len(faces)} faces)',
+                    flatshading=False,
+                    lighting=dict(ambient=0.5, diffuse=0.8, specular=0.2),
+                    lightposition=dict(x=100, y=200, z=300)
+                ))
 
-        # 3. Edge links / AAG edges using self.colors_rgb
-        edge_groups = {
-            'Convex': {
-                'edges': [],
-                'color': self.colors_rgb['edge_convex'],
-                'width': 4,
-                'name': 'Convex edges'
-            },
-            'Concave': {
-                'edges': [],
-                'color': self.colors_rgb['edge_concave'],
-                'width': 4,
-                'name': 'Concave edges'
-            },
-            'Tangent': {
-                'edges': [],
-                'color': self.colors_rgb['edge_tangent'],
-                'width': 3,
-                'name': 'Tangent edges'
-            },
-            'Unknown': {
-                'edges': [],
-                'color': (0.5, 0.5, 0.5),  # grey
-                'width': 2,
-                'name': 'Unknown edges'
+        # 2. Optional: Face centers with labels
+        if show_face_centers:
+            centers = [f['face_center'] for f in self.face_data_list]
+
+            for feature, color_rgb in feature_colors.items():
+                if feature == 'unrecognized':
+                    continue
+
+                # Find faces belonging to this feature
+                indices = [
+                    idx for idx in face_to_feature.keys()
+                    if face_to_feature[idx] == feature
+                       and self.face_data_list[idx]['stock_face'] != 'Yes'
+                ]
+
+                if not indices:
+                    continue
+
+                xs = [centers[i][0] for i in indices]
+                ys = [centers[i][1] for i in indices]
+                zs = [centers[i][2] for i in indices]
+
+                r, g, b = color_rgb
+                color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
+                fig.add_trace(go.Scatter3d(
+                    x=xs, y=ys, z=zs,
+                    mode='markers+text',
+                    marker=dict(
+                        size=node_size,
+                        color=color_str,
+                        line=dict(width=2, color='black')
+                    ),
+                    text=[str(i) for i in indices],
+                    textposition='middle center',
+                    textfont=dict(size=8, color='white'),
+                    name=f'{feature} centers',
+                    hovertemplate=(
+                            "Face %{text}<br>Feature: " + feature +
+                            "<br>Center: (%{x:.2f}, %{y:.2f}, %{z:.2f})<extra></extra>"
+                    )
+                ))
+
+        # 3. Optional: AAG edges
+        if show_edges:
+            edge_groups = {
+                'Concave': {
+                    'edges': [],
+                    'color': self.colors_rgb['edge_concave'],
+                    'width': 4,
+                    'name': 'Concave edges'
+                },
+                'Tangent': {
+                    'edges': [],
+                    'color': self.colors_rgb['edge_tangent'],
+                    'width': 3,
+                    'name': 'Tangent edges'
+                }
             }
-        }
 
-        drawn_pairs = set()
-        for edge in self.edge_data_list:
-            for pair in edge['faces_of_edge']:
-                i, j = pair
-                if i == j:
+            centers = [f['face_center'] for f in self.face_data_list]
+            drawn_pairs = set()
+
+            for edge in self.edge_data_list:
+                for pair in edge['faces_of_edge']:
+                    i, j = pair
+                    if i == j:
+                        continue
+                    idx_pair = tuple(sorted((i, j)))
+                    if idx_pair in drawn_pairs:
+                        continue
+                    drawn_pairs.add(idx_pair)
+
+                    classification = 'Unknown'
+                    if edge['classification']:
+                        classification = edge['classification'][0]
+
+                    if classification == 'Convex':
+                        continue
+
+                    group = edge_groups.get(classification)
+                    if group:
+                        group['edges'].append((i, j, edge))
+
+            for group in edge_groups.values():
+                if not group['edges']:
                     continue
-                idx_pair = tuple(sorted((i, j)))
-                if idx_pair in drawn_pairs:
-                    continue
-                drawn_pairs.add(idx_pair)
+                x_line, y_line, z_line = [], [], []
+                for (f1, f2, e_info) in group['edges']:
+                    x1, y1, z1 = centers[f1]
+                    x2, y2, z2 = centers[f2]
+                    x_line.extend([x1, x2, None])
+                    y_line.extend([y1, y2, None])
+                    z_line.extend([z1, z2, None])
 
-                # choose a classification string
-                classification = 'Unknown'
-                if edge['classification']:
-                    # pick first or change logic if needed
-                    classification = edge['classification'][0]
+                r, g, b = group['color']
+                fig.add_trace(go.Scatter3d(
+                    x=x_line, y=y_line, z=z_line, mode='lines',
+                    line=dict(
+                        color=f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})',
+                        width=group['width']
+                    ),
+                    name=f"{group['name']} ({len(group['edges'])})"
+                ))
 
-                if classification == 'Convex':
-                    continue
-
-                group = edge_groups.get(classification, edge_groups['Unknown'])
-                group['edges'].append((i, j, edge))
-
-        for group in edge_groups.values():
-            if not group['edges']:
-                continue
-            x_line, y_line, z_line = [], [], []
-            hover_text = []
-            for (f1, f2, e_info) in group['edges']:
-                x1, y1, z1 = centers[f1]
-                x2, y2, z2 = centers[f2]
-                x_line.extend([x1, x2, None])
-                y_line.extend([y1, y2, None])
-                z_line.extend([z1, z2, None])
-                hover_label = (
-                    f"Edge {e_info['index']}<br>Faces: {f1} ↔ {f2}<br>"
-                    f"Classification: {e_info['classification']}<br>"
-                    f"Length: {e_info['edge_length']:.2f}"
-                )
-                hover_text.extend([hover_label, hover_label, None])
-
-            r, g, b = group['color']
-            fig.add_trace(go.Scatter3d(
-                x=x_line, y=y_line, z=z_line, mode='lines',
-                line=dict(
-                    color=f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})',
-                    width=group['width']
-                ),
-                name=f"{group['name']} ({len(group['edges'])})",
-                hovertemplate="%{text}<extra></extra>",
-                text=hover_text
-            ))
-
-        # 4. Features
-
-
-        # 5. Final things
+        # 4. Final layout
         fig.update_layout(
-            title="AAG Graph from 3D Model" + (" (no convex edges and stock faces)" if hide_convex else ""),
+            title="Feature Recognition Visualization",
             scene=dict(
                 xaxis_title="X",
                 yaxis_title="Y",
