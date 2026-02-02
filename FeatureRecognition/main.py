@@ -22,7 +22,6 @@ def main():
     print_face_analysis_table(all_faces, face_data_list)
     print_edge_analysis_table(all_edges, edge_data_list)
 
-
     # PART 2: Build AAG
     print("\n PART 2: AAG CONSTRUCTION")
     builder2D = AAGBuilder_2D(my_shape)
