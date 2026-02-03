@@ -13,34 +13,156 @@ class FeatureLibrary:
 
     def build_library(self):
         # Blind hole: cylinder wall + plane bottom, concave edge
-        G_blind = nx.Graph()
-        G_blind.add_node(
+        G_hole_blind = nx.Graph()
+        G_hole_blind.add_node(
             0,
             face_type='Cylinder',
             geometry='Cylinder',
             adjacent_faces=[1],
             stock_face='No'
         )
-        G_blind.add_node(
+        G_hole_blind.add_node(
             1,
             face_type='Plane',
             geometry='Plane',
             adjacent_faces=[0],
             stock_face='No'
         )
-        G_blind.add_edge(0, 1, edge_type='concave')
-        self.features['feat_hole_blind'] = G_blind
+        G_hole_blind.add_edge(0, 1, edge_type='concave')
+        self.features['feat_hole_blind'] = G_hole_blind
 
         # Through hole: 1 cylinder wall
-        G_through = nx.Graph()
-        G_through.add_node(
+        G_hole_through = nx.Graph()
+        G_hole_through.add_node(
             0,
             face_type='Cylinder',
             geometry='Cylinder',
             adjacent_faces=[],
             stock_face='No'
         )
-        self.features['feat_hole_through'] = G_through
+        self.features['feat_hole_through'] = G_hole_through
+
+        # Blind Pocket: 5 nodes, 1 base connected with concave to all the other 4 and
+        # the other 4 creating a "loop" of concave connection
+        # all nodes are planes
+        G_pocket_blind = nx.Graph()
+
+        G_pocket_blind.add_node(0, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[1, 2, 3, 4], stock_face='No')
+
+        G_pocket_blind.add_node(1, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0, 2, 4], stock_face='No')
+
+        G_pocket_blind.add_node(2, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0, 1, 3], stock_face='No')
+
+        G_pocket_blind.add_node(3, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0, 2, 4], stock_face='No')
+
+        G_pocket_blind.add_node(4, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0, 1, 3], stock_face='No')
+
+        # 1. Connect Node 0 to all 4 walls
+        G_pocket_blind.add_edge(0, 1, edge_type='concave')
+        G_pocket_blind.add_edge(0, 2, edge_type='concave')
+        G_pocket_blind.add_edge(0, 3, edge_type='concave')
+        G_pocket_blind.add_edge(0, 4, edge_type='concave')
+
+        # 2. Connect the walls to each other (The cycle 1-2-3-4-1)
+        G_pocket_blind.add_edge(1, 2, edge_type='concave')
+        G_pocket_blind.add_edge(2, 3, edge_type='concave')
+        G_pocket_blind.add_edge(3, 4, edge_type='concave')
+        G_pocket_blind.add_edge(4, 1, edge_type='concave')
+        self.features['feat_pocket_blind'] = G_pocket_blind
+
+        # Through Pocket: 4 nodes creating a "loop" of concave connection
+        # all nodes are planes
+        G_pocket_through = nx.Graph()
+        G_pocket_through.add_node(1, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[2, 4], stock_face='No')
+
+        G_pocket_through.add_node(2, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[1, 3], stock_face='No')
+
+        G_pocket_through.add_node(3, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[2, 4], stock_face='No')
+
+        G_pocket_through.add_node(4, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[1, 3], stock_face='No')
+
+        G_pocket_through.add_edge(1, 2, edge_type='concave')
+        G_pocket_through.add_edge(2, 3, edge_type='concave')
+        G_pocket_through.add_edge(3, 4, edge_type='concave')
+        G_pocket_through.add_edge(4, 1, edge_type='concave')
+        self.features['feat_pocket_through'] = G_pocket_through
+
+
+        # Blind Slot: 4 nodes, 0 and 1 connected and 2 and 3 connected to both 0 and 1
+        # all nodes are planes
+        G_slot_blind = nx.Graph()
+        G_slot_blind.add_node(0, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[1, 2, 3], stock_face='No')
+
+        G_slot_blind.add_node(1, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0, 2, 3], stock_face='No')
+
+        G_slot_blind.add_node(2, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0, 1], stock_face='No')
+
+        G_slot_blind.add_node(3, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0, 1], stock_face='No')
+
+        G_slot_blind.add_edge(0, 1, edge_type='concave')
+        G_slot_blind.add_edge(0, 2, edge_type='concave')
+        G_slot_blind.add_edge(0, 3, edge_type='concave')
+        G_slot_blind.add_edge(1, 2, edge_type='concave')
+        G_slot_blind.add_edge(1, 3, edge_type='concave')
+        self.features['feat_slot_blind'] = G_slot_blind
+
+        # Through Slot: 3 nodes, 0 connected to both 1 and 2
+        # all nodes are planes
+        G_slot_through = nx.Graph()
+        G_slot_through.add_node(0, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[1, 2], stock_face='No')
+
+        G_slot_through.add_node(1, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0], stock_face='No')
+
+        G_slot_through.add_node(2, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0], stock_face='No')
+
+        G_slot_through.add_edge(0, 1, edge_type='concave')
+        G_slot_through.add_edge(0, 2, edge_type='concave')
+        self.features['feat_slot_through'] = G_slot_through
+
+        # Blind Step: 3 nodes connected in "loop"
+        # all nodes are planes
+        G_step_blind = nx.Graph()
+        G_step_blind.add_node(0, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[1, 2], stock_face='No')
+
+        G_step_blind.add_node(1, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0, 2], stock_face='No')
+
+        G_step_blind.add_node(2, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0, 1], stock_face='No')
+
+        G_step_blind.add_edge(0, 1, edge_type='concave')
+        G_step_blind.add_edge(0, 2, edge_type='concave')
+        G_step_blind.add_edge(1, 2, edge_type='concave')
+        self.features['feat_step_blind'] = G_step_blind
+
+        # Through Step: 2 connected nodes
+        # all nodes are planes
+        G_step_through = nx.Graph()
+        G_step_through.add_node(0, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[1], stock_face='No')
+
+        G_step_through.add_node(1, face_type='Plane', geometry='Plane',
+                                adjacent_faces=[0], stock_face='No')
+
+        G_step_through.add_edge(0, 1, edge_type='concave')
+        self.features['feat_step_through'] = G_step_through
 
     def get(self, name: str) -> nx.Graph:
         """Return a copy of the pattern graph so you don't mutate the library."""
@@ -58,8 +180,7 @@ class FeatureRecognition:
 
         # library
         self.lib = FeatureLibrary()
-        self.blind_pattern = self.lib.get('feat_hole_blind')
-        self.through_pattern = self.lib.get('feat_hole_through')
+
 
         self.matches: List[Dict] = []
 

@@ -71,14 +71,24 @@ def get_face_geometry(face):
     else:
         return "Other", None
 
-def define_stock_face (face, shape, tol=1e-3):
-    face_type, _ = get_face_geometry(face)
+
+def define_stock_face(face_data):
+    # Plane and has NO concave neighbors, it's a Stock Face
+    if face_data["type"] != "Plane":
+        return "No"
+
+    if len(face_data['concave_adjacent']) == 0:
+        return "Yes"
+    else:
+        return "No"
+
+
+
+    '''
     xmin, ymin, zmin, xmax, ymax, zmax, stock_box_center = get_stock_box(shape, 1e-6)
     face_center_coords, _ = get_face_center(face)
     x, y, z = face_center_coords
-    if face_type != "Plane":
-        return "No"
-
+    
     face_xmin = abs(x - xmin) <= tol
     face_xmax = abs(x - xmax) <= tol
     face_ymin = abs(y - ymin) <= tol
@@ -90,6 +100,7 @@ def define_stock_face (face, shape, tol=1e-3):
         return "Yes"
     else:
         return "No"
+    '''
 
 def normal_vector_face (face, shape):
     _, _, _, _, _, _, stock_box_center = get_stock_box(shape, 1e-6)
@@ -277,7 +288,7 @@ def analyze_shape(my_shape):
     for i, face in enumerate(all_faces):
         face_type, geometry = get_face_geometry(face)
         face_center, _ = get_face_center(face)
-        stock_face = define_stock_face(face, my_shape,1e-3)
+
         n, n_coords, n_axis = normal_vector_face(face, my_shape)
         vertices, triangles = triangulate_face(face, linear_deflection) #mesh triangulation
         face_data_list.append({
@@ -286,7 +297,7 @@ def analyze_shape(my_shape):
             "type": face_type,
             "geom": geometry,
             "face_center": face_center,
-            "stock_face": stock_face,
+            "stock_face": "Pending",
             "adjacent_indices": [],
             "convex_adjacent" : [],
             "concave_adjacent" : [],
@@ -382,6 +393,13 @@ def analyze_shape(my_shape):
                     face_data['concave_adjacent'].append(adj_index)
                 elif edge_type == "Tangent":
                     face_data['tangent_adjacent'].append(adj_index)
+
+    # 5. FINAL PASS: Determine Stock Faces
+    # =========================================================
+    # Now that 'concave_adjacent' is populated, we can check it safely.
+
+    for face_data in face_data_list:
+        face_data["stock_face"] = define_stock_face(face_data)
 
     return all_faces, face_data_list, analyser, all_edges, edge_data_list
 
