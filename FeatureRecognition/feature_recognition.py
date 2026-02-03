@@ -224,47 +224,52 @@ class FeatureRecognition:
 
         return self.matches
 
-    def visualize_features_3d(self, show_mesh=True, mesh_opacity=0.7, node_size=15,
-                                  show_face_centers=True, show_edges=True):
+    def visualize_features_3d(self, show_mesh=True, mesh_opacity=0.7,
+                              show_face_centers=True, show_edges=True):
         import plotly.graph_objects as go
         import numpy as np
 
         fig = go.Figure()
 
-        # Create a mapping: face_index -> feature info
+        feature_name_map = {
+            'feat_hole_blind': 'Blind Hole',
+            'feat_hole_through': 'Through Hole',
+            'feat_pocket_blind': 'Blind Pocket',
+            'feat_pocket_through': 'Through Pocket',
+            'feat_slot_blind': 'Blind Slot',
+            'feat_slot_through': 'Through Slot',
+            'feat_step_blind': 'Blind Step',
+            'feat_step_through': 'Through Step',
+            'unrecognized': 'Unrecognized Face',
+            'stock': 'Part Body'
+        }
+
         face_to_feature = {}
         for match in self.matches:
             feature_type = match['feature_type']
             for face_idx in match['node_indices']:
                 face_to_feature[face_idx] = feature_type
 
-        # Define feature colors
         feature_colors = self.colors_rgb
 
-        # 1. Visualize face meshes colored by feature
+        # Colored Features + mesh
         if show_mesh:
-            # Group faces by feature type
             feature_groups = {}
             for face_data in self.face_data_list:
                 face_idx = face_data['index']
 
-                # Skip stock faces
                 if face_data['stock_face'] == 'Yes':
-                    continue
-
-                # Determine feature membership
-                if face_idx in face_to_feature:
-                    feature = face_to_feature[face_idx]
+                    group_key = 'stock'
+                elif face_idx in face_to_feature:
+                    group_key = face_to_feature[face_idx]
                 else:
-                    feature = 'unrecognized'
+                    group_key = 'unrecognized'
 
-                if feature not in feature_groups:
-                    feature_groups[feature] = []
-                feature_groups[feature].append(face_data)
+                if group_key not in feature_groups:
+                    feature_groups[group_key] = []
+                feature_groups[group_key].append(face_data)
 
-            # Create one mesh trace per feature type
-            for feature, faces in feature_groups.items():
-                # Collect all vertices and triangles for this feature
+            for group_key, faces in feature_groups.items():
                 all_vertices = []
                 all_triangles = []
                 vertex_offset = 0
@@ -276,27 +281,31 @@ class FeatureRecognition:
                     if not vertices or not triangles:
                         continue
 
-                    # Add vertices
                     all_vertices.extend(vertices)
-
-                    # Add triangles with offset
                     for tri in triangles:
                         all_triangles.append([
                             tri[0] + vertex_offset,
                             tri[1] + vertex_offset,
                             tri[2] + vertex_offset
                         ])
-
                     vertex_offset += len(vertices)
 
                 if not all_vertices:
                     continue
 
-                # Get color for this feature
-                r, g, b = feature_colors.get(feature, (0.7, 0.7, 0.7))
-                color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+                if group_key == 'stock':
+                    color_str = 'rgb(200, 200, 200)'
+                    current_opacity = 0.1  # Very transparent for stock
+                elif group_key == 'unrecognized':
+                    color_str = 'rgb(100, 100, 100)'
+                    current_opacity = 0.5
+                else:
+                    r, g, b = feature_colors.get(group_key, (0.7, 0.7, 0.7))
+                    color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+                    current_opacity = mesh_opacity
 
-                # Create mesh trace
+                display_name = feature_name_map.get(group_key, group_key)
+
                 fig.add_trace(go.Mesh3d(
                     x=[v[0] for v in all_vertices],
                     y=[v[1] for v in all_vertices],
@@ -305,122 +314,118 @@ class FeatureRecognition:
                     j=[t[1] for t in all_triangles],
                     k=[t[2] for t in all_triangles],
                     color=color_str,
-                    opacity=mesh_opacity,
-                    name=f'{feature} ({len(faces)} faces)',
+                    opacity=current_opacity,
+                    name=display_name,
+                    showlegend=True,
                     flatshading=False,
                     lighting=dict(ambient=0.5, diffuse=0.8, specular=0.2),
                     lightposition=dict(x=100, y=200, z=300)
                 ))
 
-            # 2. Face centers with labels
-            if show_face_centers:
-                centers = [f['face_center'] for f in self.face_data_list]
+        # 2. FACE nodes
+        if show_face_centers:
+            face_types = [f['type'] for f in self.face_data_list]
+            centers = [f['face_center'] for f in self.face_data_list]
 
-                # Define the name mapping once, outside the loop
-                feature_name_map = {
-                    'feat_hole_blind': 'Blind Hole',
-                    'feat_hole_through': 'Through Hole'
+            face_colors = {
+                'Plane': self.colors_rgb.get('geo_plane', (0, 1, 0)),
+                'Cylinder': self.colors_rgb.get('geo_cylinder', (1, 0, 0)),
+                'Other': self.colors_rgb.get('geo_other', (0, 0, 1))
+            }
+
+            for ftype in sorted(set(face_types)):
+                # only non-stock faces
+                indices = [
+                    f['index']
+                    for f in self.face_data_list
+                    if f['type'] == ftype and f['stock_face'] != "Yes"
+                ]
+
+                if not indices:
+                    continue
+
+                xs = [centers[i][0] for i in indices]
+                ys = [centers[i][1] for i in indices]
+                zs = [centers[i][2] for i in indices]
+
+                r, g, b = face_colors.get(ftype, (0.5, 0.5, 0.5))
+                color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
+                fig.add_trace(go.Scatter3d(
+                    x=xs, y=ys, z=zs,
+                    mode='markers+text',
+                    marker=dict(size=5, color=color_str, line=dict(width=1, color='black')),
+                    text=[str(i) for i in indices],
+                    name=f'{ftype} Nodes',
+                    showlegend=False
+                ))
+
+        # 3. EDGES
+        if show_edges:
+            edge_groups = {
+                'Convex': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': self.colors_rgb.get('edge_convex', (0, 0, 1)),  # Blue-ish
+                    'width': 4
+                },
+                'Concave': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': self.colors_rgb.get('edge_concave', (1, 0, 0)),  # Red
+                    'width': 4
+                },
+                'Tangent': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': self.colors_rgb.get('edge_tangent', (0, 1, 0)),  # Green
+                    'width': 3
+                },
+                'Unknown': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': (0.5, 0.5, 0.5),
+                    'width': 2
                 }
+            }
 
-                # Single Loop: Iterate through features once
-                for feature, color_rgb in feature_colors.items():
-                    if feature == 'unrecognized':
-                        continue
+            for edge in self.edge_data_list:
+                # Type
+                etype = 'Unknown'
+                if edge.get('classification'):
+                    etype = edge['classification'][0]  # Take the first classification
 
-                    # Find faces belonging to this feature
-                    indices = [
-                        idx for idx in face_to_feature.keys()
-                        if face_to_feature[idx] == feature
-                           and self.face_data_list[idx]['stock_face'] != 'Yes'
-                    ]
+                # Geometry Points
+                points = edge.get('points', [])
+                if len(points) == 0:
+                    continue
 
-                    if not indices:
-                        continue
+                group = edge_groups.get(etype, edge_groups['Unknown'])
 
-                    # Get coordinates
-                    xs = [centers[i][0] for i in indices]
-                    ys = [centers[i][1] for i in indices]
-                    zs = [centers[i][2] for i in indices]
+                group['x'].extend([p[0] for p in points] + [None])
+                group['y'].extend([p[1] for p in points] + [None])
+                group['z'].extend([p[2] for p in points] + [None])
 
-                    # Determine color and name
-                    r, g, b = color_rgb
-                    color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+            for name, group in edge_groups.items():
+                if not group['x']:
+                    continue
 
-                    # Get the pretty name (default to raw name if not in map)
-                    display_name = feature_name_map.get(feature, feature)
+                r, g, b = group['color']
+                color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
 
-                    fig.add_trace(go.Scatter3d(
-                        x=xs, y=ys, z=zs,
-                        mode='markers+text',
-                        marker=dict(
-                            size=node_size,
-                            color=color_str,
-                            line=dict(width=2, color='black')
-                        ),
-                        text=[str(i) for i in indices],
-                        textposition='middle center',
-                        textfont=dict(size=8, color='white'),
-                        name=f'{display_name} Centers',
-                        hovertemplate=(
-                                "Face %{text}<br>Feature: " + display_name +
-                                "<br>Center: (%{x:.2f}, %{y:.2f}, %{z:.2f})<extra></extra>"
-                        )
-                    ))
+                fig.add_trace(go.Scatter3d(
+                    x=group['x'], y=group['y'], z=group['z'],
+                    mode='lines',
+                    line=dict(color=color_str, width=group['width']),
+                    name=f"{name} Edges",
+                    showlegend=True
+                ))
 
-            # 3. Edges (Geometric) - COMPLETELY SEPARATE BLOCK
-            if show_edges:
-                edge_groups = {
-                    'Concave': {
-                        'x': [], 'y': [], 'z': [],
-                        'color': self.colors_rgb.get('edge_concave', (1, 0, 0)),
-                        'width': 5
-                    },
-                    'Tangent': {
-                        'x': [], 'y': [], 'z': [],
-                        'color': self.colors_rgb.get('edge_tangent', (0, 0, 1)),
-                        'width': 3
-                    }
-                }
-
-                for edge in self.edge_data_list:
-                    if not edge.get('classification'):
-                        continue
-
-                    edge_type = edge['classification'][0]
-
-                    if edge_type in edge_groups:
-                        points = edge['points']
-                        # Add points separated by None to create discontinuous lines
-                        edge_groups[edge_type]['x'].extend([p[0] for p in points] + [None])
-                        edge_groups[edge_type]['y'].extend([p[1] for p in points] + [None])
-                        edge_groups[edge_type]['z'].extend([p[2] for p in points] + [None])
-
-                for name, group in edge_groups.items():
-                    if not group['x']:
-                        continue
-
-                    r, g, b = group['color']
-                    color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
-
-                    fig.add_trace(go.Scatter3d(
-                        x=group['x'], y=group['y'], z=group['z'],
-                        mode='lines',
-                        line=dict(color=color_str, width=group['width']),
-                        name=f"{name} Edges"
-                    ))
-
-            # 4. Final layout
-            fig.update_layout(
-                title="Feature Recognition Visualization",
-                scene=dict(
-                    xaxis_title="X",
-                    yaxis_title="Y",
-                    zaxis_title="Z",
-                    aspectmode="data",
-                    camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
-                ),
-                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-                width=1200,
-                height=900
-            )
-            fig.show()
+        fig.update_layout(
+            title="Feature Recognition Visualization",
+            scene=dict(
+                xaxis_title="X",
+                yaxis_title="Y",
+                zaxis_title="Z",
+                aspectmode="data"
+            ),
+            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+            width=1200, height=900
+        )
+        fig.show()

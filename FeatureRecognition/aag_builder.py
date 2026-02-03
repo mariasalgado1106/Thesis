@@ -400,8 +400,8 @@ class AAGBuilder_2D:
             "feat_pocket_blind": (0.2, 0.8, 0.2),  # Light Green
             "feat_slot_through": (1.0, 0.08, 0.58),  # Dark Pink
             "feat_slot_blind": (1.0, 0.41, 0.71),  # Hot Pink
-            "feat_step": (1.0, 0.55, 0.0),  # Dark Orange
-            "feat_other": (1.0, 0.2, 0.1),  # Light Orange
+            "feat_step_through": (1.0, 0.55, 0.0),  # Dark Orange
+            "feat_step_blind": (1.0, 0.2, 0.1),  # Light Orange
 
             # GEOMETRY
             "geo_plane": (0.96, 0.96, 0.96),  # Light Grey
