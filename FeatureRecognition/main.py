@@ -87,9 +87,6 @@ def main():
     if choice == "6":
         builder3D.visualize_3d_aag(hide_convex=True)
 
-    '''if choice not in ["1", "2", "3", "4", "5"]:
-        recognizer.visualize_features(display)  # Default'''
-
     start_display()
 
 
