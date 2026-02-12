@@ -75,6 +75,7 @@ class FeatureLibrary:
         G_pocket_blind.add_edge(4, 1, edge_type='concave')
         self.features['feat_pocket_blind'] = G_pocket_blind
 
+
         # Through Pocket: 4 nodes creating a "loop" of concave connection
         # all nodes are planes
         G_pocket_through = nx.Graph()
@@ -184,6 +185,79 @@ class FeatureRecognition:
 
         self.matches: List[Dict] = []
 
+    # Free Form Pocket: 1 base node connected to n-1 nodes, that are all connected in a loop
+    # all nodes are planes
+    def build_free_form_pocket(self, n):
+        #BLIND
+        G_pocket_freeform_blind = nx.Graph()
+        # base node
+        G_pocket_freeform_blind.add_node(0, face_type='Plane', geometry='Plane', stock_face='No')
+        # walls 1 -> n-1
+        for i in range(1, n):
+            G_pocket_freeform_blind.add_node(i, face_type='Plane', geometry='Plane', stock_face='No')
+            # Every wall connects to the base
+            G_pocket_freeform_blind.add_edge(0, i, edge_type='concave')
+
+            # Connect to the previous wall
+            if i > 1:
+                G_pocket_freeform_blind.add_edge(i, i - 1, edge_type='concave')
+
+        # last wall must connect back to the first wall (node 1)
+        if n > 2:
+            G_pocket_freeform_blind.add_edge(n - 1, 1, edge_type='concave')
+
+        #THROUGH -> NO BASE NODE
+        G_pocket_freeform_through = nx.Graph()
+        # walls 1 -> n-1
+        for i in range(1, n):
+            G_pocket_freeform_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No')
+            # Connect to the previous wall
+            if i > 1:
+                G_pocket_freeform_through.add_edge(i, i - 1, edge_type='concave')
+        # last wall must connect back to the first wall (node 1)
+        if n > 2:
+            G_pocket_freeform_through.add_edge(n - 1, 1, edge_type='concave')
+
+        return G_pocket_freeform_blind, G_pocket_freeform_through
+
+    def is_conjoined_pocket(self, candidate_graph, candidate_nodes):
+        n = len(candidate_nodes)
+        if n < 5: return False
+
+        # 1. Identify the Base Node (highest degree)
+        # In a conjoined pocket, the floor is connected to all walls.
+        degrees = dict(candidate_graph.degree())
+        base_node = max(degrees, key=degrees.get)
+        if degrees[base_node] != n - 1:
+            return False
+
+        # 2. Check Edge Count Rule
+        # We solve for 'p' (number of pockets): p = 2(n-1) - Edges
+        num_edges = candidate_graph.number_of_edges()
+        p = (2 * (n - 1)) - num_edges
+
+        # If p > 1, it's likely a conjoined pocket
+        if p >= 2:
+            return True, p
+        return False, 0
+
+    # Free Form Slot: 1 base node connected to n-1 nodes
+    # all nodes are planes
+    def build_free_form_slot(self, n):
+        # THROUGH
+        G_slot_freeform_through = nx.Graph()
+        # base node
+        G_slot_freeform_through.add_node(0, face_type='Plane', geometry='Plane', stock_face='No')
+        # walls 1 -> n-1
+        for i in range(1, n):
+            G_slot_freeform_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No')
+            # Every wall connects to the base
+            G_slot_freeform_through.add_edge(0, i, edge_type='concave')
+
+        return G_slot_freeform_through
+
+
+
     def identify_features(self) -> List[Dict]:
 
         print(f"\n=== IDENTIFY FEATURES ===")
@@ -197,8 +271,78 @@ class FeatureRecognition:
             candidate_graph = candidate_info['subgraph']
             candidate_nodes = candidate_info['nodes']
             n_candidate_concave = candidate_info['n_concave']
+            matched = False
+
+            node_match = nx.algorithms.isomorphism.categorical_node_match('face_type', None)
+            edge_match = nx.algorithms.isomorphism.categorical_edge_match('edge_type', None)
 
             for name, pattern in self.lib.features.items():
+                if nx.is_isomorphic(candidate_graph, pattern, node_match=node_match, edge_match=edge_match):
+                    self.matches.append({'feature_type': name, 'node_indices': candidate_nodes})
+                    matched = True
+                    print(f"MATCH! Feature {self.matches[-1]['feature_type']} found")
+                    break
+
+            # If no library match, try the other ones
+            if not matched:
+                n_nodes = len(candidate_nodes)
+                G_pocket_freeform_blind, G_pocket_freeform_through = self.build_free_form_pocket(n_nodes)
+
+                if nx.is_isomorphic(candidate_graph, G_pocket_freeform_blind, node_match=node_match,
+                                            edge_match=edge_match):
+                    self.matches.append({
+                        'feature_type': f'feat_pocket_blind',
+                        'node_indices': candidate_nodes,
+                    })
+                    matched = True
+                    print(f"MATCH! Free-form blind pocket with {n_nodes} faces found.")
+
+
+                elif nx.is_isomorphic(candidate_graph, G_pocket_freeform_through, node_match=node_match,
+                edge_match=edge_match):
+                    self.matches.append({
+                        'feature_type': f'feat_pocket_through',
+                        'node_indices': candidate_nodes,
+                    })
+                    matched = True
+                    print(f"MATCH! Free-form through pocket with {n_nodes} faces found.")
+
+
+            if not matched:
+                n_nodes = len(candidate_nodes)
+                G_slot_freeform_through= self.build_free_form_slot(n_nodes)
+
+                if nx.is_isomorphic(candidate_graph, G_slot_freeform_through, node_match=node_match,
+                                            edge_match=edge_match):
+                    self.matches.append({
+                        'feature_type': f'feat_slot_through',
+                        'node_indices': candidate_nodes,
+                    })
+                    matched = True
+                    print(f"MATCH! Free-form through slot with {n_nodes} faces found.")
+
+
+
+            if not matched:
+                # Try the Rule-Based approach for Conjoined Pockets
+                is_conjoined, num_pockets = self.is_conjoined_pocket(candidate_graph, candidate_nodes)
+
+                if is_conjoined:
+                    self.matches.append({
+                        'feature_type': f'feat_pocket_blind',
+                        'node_indices': candidate_nodes,
+                        'num_sub_features': num_pockets
+                    })
+                    print(f"MATCH! Conjoined feature found with {num_pockets} pockets.")
+                    matched = True
+
+
+            if not matched:
+                print(f"Candidate {candidate_idx} still unrecognized.")
+
+
+
+            '''for name, pattern in self.lib.features.items():
                 print(f"\nChecking if candidate {candidate_idx} matches {name}")
                 print(f"  Candidate nodes: {len(candidate_nodes)}, Pattern nodes: {len(pattern.nodes())}")
                 print(f"  Candidate edges: {n_candidate_concave}, Pattern edges: {len(pattern.edges())}")
@@ -215,7 +359,15 @@ class FeatureRecognition:
                     print(f"MATCH! Feature {self.matches[-1]['feature_type']} found")
                     break  # Stop checking other patterns for this candidate
                 else:
-                    print(f"NO match")
+                    G_pocket_freeform = self.build_free_form_pocket(len(candidate_nodes))
+                    if nx.is_isomorphic(candidate_graph, G_pocket_freeform, node_match=node_match, edge_match=edge_match):
+                        self.matches.append({
+                            'feature_type': "Free Form Pocket",
+                            'node_indices': candidate_nodes,
+                        })
+                        print(f"MATCH! Feature {self.matches[-1]['feature_type']} found")
+                else:
+                    print(f"NO match")'''
 
         print(f"\n=== FINAL RESULTS ===")
         print(f"Total matches: {len(self.matches)}")
@@ -295,7 +447,7 @@ class FeatureRecognition:
 
                 if group_key == 'stock':
                     color_str = 'rgb(200, 200, 200)'
-                    current_opacity = 0.1  # Very transparent for stock
+                    current_opacity = 0.1
                 elif group_key == 'unrecognized':
                     color_str = 'rgb(100, 100, 100)'
                     current_opacity = 0.5
