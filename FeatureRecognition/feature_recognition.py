@@ -19,14 +19,16 @@ class FeatureLibrary:
             face_type='Cylinder',
             geometry='Cylinder',
             adjacent_faces=[1],
-            stock_face='No'
+            stock_face='No',
+            role='wall'
         )
         G_hole_blind.add_node(
             1,
             face_type='Plane',
             geometry='Plane',
             adjacent_faces=[0],
-            stock_face='No'
+            stock_face='No',
+            role='base'
         )
         G_hole_blind.add_edge(0, 1, edge_type='concave')
         self.features['feat_hole_blind'] = G_hole_blind
@@ -38,7 +40,8 @@ class FeatureLibrary:
             face_type='Cylinder',
             geometry='Cylinder',
             adjacent_faces=[],
-            stock_face='No'
+            stock_face='No',
+            role='wall'
         )
         self.features['feat_hole_through'] = G_hole_through
 
@@ -48,19 +51,19 @@ class FeatureLibrary:
         G_pocket_blind = nx.Graph()
 
         G_pocket_blind.add_node(0, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 2, 3, 4], stock_face='No')
+                                adjacent_faces=[1, 2, 3, 4], stock_face='No', role='base')
 
         G_pocket_blind.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 2, 4], stock_face='No')
+                                adjacent_faces=[0, 2, 4], stock_face='No', role='wall')
 
         G_pocket_blind.add_node(2, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 1, 3], stock_face='No')
+                                adjacent_faces=[0, 1, 3], stock_face='No', role='wall')
 
         G_pocket_blind.add_node(3, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 2, 4], stock_face='No')
+                                adjacent_faces=[0, 2, 4], stock_face='No', role='wall')
 
         G_pocket_blind.add_node(4, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 1, 3], stock_face='No')
+                                adjacent_faces=[0, 1, 3], stock_face='No', role='wall')
 
         # 1. Connect Node 0 to all 4 walls
         G_pocket_blind.add_edge(0, 1, edge_type='concave')
@@ -80,16 +83,16 @@ class FeatureLibrary:
         # all nodes are planes
         G_pocket_through = nx.Graph()
         G_pocket_through.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[2, 4], stock_face='No')
+                                adjacent_faces=[2, 4], stock_face='No', role='wall')
 
         G_pocket_through.add_node(2, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 3], stock_face='No')
+                                adjacent_faces=[1, 3], stock_face='No', role='wall')
 
         G_pocket_through.add_node(3, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[2, 4], stock_face='No')
+                                adjacent_faces=[2, 4], stock_face='No', role='wall')
 
         G_pocket_through.add_node(4, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 3], stock_face='No')
+                                adjacent_faces=[1, 3], stock_face='No', role='wall')
 
         G_pocket_through.add_edge(1, 2, edge_type='concave')
         G_pocket_through.add_edge(2, 3, edge_type='concave')
@@ -102,16 +105,16 @@ class FeatureLibrary:
         # all nodes are planes
         G_slot_blind = nx.Graph()
         G_slot_blind.add_node(0, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 2, 3], stock_face='No')
+                                adjacent_faces=[1, 2, 3], stock_face='No', role='base')
 
         G_slot_blind.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 2, 3], stock_face='No')
+                                adjacent_faces=[0, 2, 3], stock_face='No', role='base')
 
         G_slot_blind.add_node(2, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 1], stock_face='No')
+                                adjacent_faces=[0, 1], stock_face='No', role='wall')
 
         G_slot_blind.add_node(3, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 1], stock_face='No')
+                                adjacent_faces=[0, 1], stock_face='No', role='wall')
 
         G_slot_blind.add_edge(0, 1, edge_type='concave')
         G_slot_blind.add_edge(0, 2, edge_type='concave')
@@ -124,13 +127,13 @@ class FeatureLibrary:
         # all nodes are planes
         G_slot_through = nx.Graph()
         G_slot_through.add_node(0, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 2], stock_face='No')
+                                adjacent_faces=[1, 2], stock_face='No', role='base')
 
         G_slot_through.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0], stock_face='No')
+                                adjacent_faces=[0], stock_face='No', role='wall')
 
         G_slot_through.add_node(2, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0], stock_face='No')
+                                adjacent_faces=[0], stock_face='No', role='wall')
 
         G_slot_through.add_edge(0, 1, edge_type='concave')
         G_slot_through.add_edge(0, 2, edge_type='concave')
@@ -140,13 +143,13 @@ class FeatureLibrary:
         # all nodes are planes
         G_step_blind = nx.Graph()
         G_step_blind.add_node(0, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 2], stock_face='No')
+                                adjacent_faces=[1, 2], stock_face='No', role='base')
 
         G_step_blind.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 2], stock_face='No')
+                                adjacent_faces=[0, 2], stock_face='No', role='base')
 
         G_step_blind.add_node(2, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 1], stock_face='No')
+                                adjacent_faces=[0, 1], stock_face='No', role='base')
 
         G_step_blind.add_edge(0, 1, edge_type='concave')
         G_step_blind.add_edge(0, 2, edge_type='concave')
@@ -157,12 +160,12 @@ class FeatureLibrary:
         # all nodes are planes
         G_step_through = nx.Graph()
         G_step_through.add_node(0, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1], stock_face='No')
+                                adjacent_faces=[1], stock_face='No', role='base')
 
         G_step_through.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0], stock_face='No')
+                                adjacent_faces=[0], stock_face='No', role='base')
 
-        G_step_through.add_edge(0, 1, edge_type='concave')
+        G_step_through.add_edge(0, 1, edge_type='concave', role='base')
         self.features['feat_step_through'] = G_step_through
 
     def get(self, name: str) -> nx.Graph:
@@ -195,10 +198,10 @@ class FeatureRecognition:
         #BLIND
         G_pocket_freeform_blind = nx.Graph()
         # base node
-        G_pocket_freeform_blind.add_node(0, face_type='Plane', geometry='Plane', stock_face='No')
+        G_pocket_freeform_blind.add_node(0, face_type='Plane', geometry='Plane', stock_face='No', role='base')
         # walls 1 -> n-1
         for i in range(1, n):
-            G_pocket_freeform_blind.add_node(i, face_type='Plane', geometry='Plane', stock_face='No')
+            G_pocket_freeform_blind.add_node(i, face_type='Plane', geometry='Plane', stock_face='No', role='wall')
             # Every wall connects to the base
             G_pocket_freeform_blind.add_edge(0, i, edge_type='concave')
 
@@ -213,7 +216,7 @@ class FeatureRecognition:
         #THROUGH -> NO BASE NODE
         G_pocket_freeform_through = nx.Graph()
         for i in range(1, n+1):
-            G_pocket_freeform_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No')
+            G_pocket_freeform_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No', role='wall')
             # Connect to the previous wall
             if i > 1:
                 G_pocket_freeform_through.add_edge(i, i - 1, edge_type='concave')
@@ -224,7 +227,7 @@ class FeatureRecognition:
         # OTHER FREE FORM THROUGH --> open loop because of convex edge
         G_pocket_other_freeform_through = nx.Graph()
         for i in range(1, n+1):
-            G_pocket_other_freeform_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No')
+            G_pocket_other_freeform_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No', role='wall')
             # Connect to the previous wall
             if i > 1:
                 G_pocket_other_freeform_through.add_edge(i, i - 1, edge_type='concave')
@@ -252,7 +255,7 @@ class FeatureRecognition:
 
         # If p > 1, it's likely a conjoined pocket
         if p >= 2:
-            return True, p
+            return True, p, base_node
         return False, 0
 
     # Free Form Slot: 1 base node connected to n-1 nodes
@@ -261,16 +264,19 @@ class FeatureRecognition:
         # THROUGH
         G_slot_freeform_through = nx.Graph()
         # base node
-        G_slot_freeform_through.add_node(0, face_type='Plane', geometry='Plane', stock_face='No')
+        G_slot_freeform_through.add_node(0, face_type='Plane', geometry='Plane',
+                                         stock_face='No', role='base')
         # walls 1 -> n-1
         for i in range(1, n):
-            G_slot_freeform_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No')
+            G_slot_freeform_through.add_node(i, face_type='Plane', geometry='Plane',
+                                             stock_face='No', role='wall')
             # Every wall connects to the base
             G_slot_freeform_through.add_edge(0, i, edge_type='concave')
 
         #SINGLE FACE -> SLOT
         G_slot_freeform_face = nx.Graph()
-        G_slot_freeform_face.add_node(0, face_type='Plane', geometry='Plane', stock_face='No')
+        G_slot_freeform_face.add_node(0, face_type='Plane', geometry='Plane',
+                                      stock_face='No', role='wall')
 
         return G_slot_freeform_through, G_slot_freeform_face
 
@@ -334,7 +340,7 @@ class FeatureRecognition:
 
             # 4. Conjoined Pockets
             if not matched:
-                is_conjoined, num_pockets= self.is_conjoined_pocket(candidate_graph, candidate_nodes)
+                is_conjoined, num_pockets, base_node= self.is_conjoined_pocket(candidate_graph, candidate_nodes)
                 if is_conjoined:
                     self.matches.append({
                             'feature_type': f'feat_pocket_blind',
