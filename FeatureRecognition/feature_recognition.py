@@ -188,6 +188,10 @@ class FeatureRecognition:
     # Free Form Pocket: 1 base node connected to n-1 nodes, that are all connected in a loop
     # all nodes are planes
     def build_free_form_pocket(self, n):
+        if n < 4:
+            # Return empty graphs so nx.is_isomorphic will naturally fail
+            return nx.Graph(), nx.Graph(), nx.Graph()
+
         #BLIND
         G_pocket_freeform_blind = nx.Graph()
         # base node
@@ -208,31 +212,41 @@ class FeatureRecognition:
 
         #THROUGH -> NO BASE NODE
         G_pocket_freeform_through = nx.Graph()
-        # walls 1 -> n-1
-        for i in range(1, n):
+        for i in range(1, n+1):
             G_pocket_freeform_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No')
             # Connect to the previous wall
             if i > 1:
                 G_pocket_freeform_through.add_edge(i, i - 1, edge_type='concave')
         # last wall must connect back to the first wall (node 1)
         if n > 2:
-            G_pocket_freeform_through.add_edge(n - 1, 1, edge_type='concave')
+            G_pocket_freeform_through.add_edge(n, 1, edge_type='concave')
 
-        return G_pocket_freeform_blind, G_pocket_freeform_through
+        # OTHER FREE FORM THROUGH --> open loop because of convex edge
+        G_pocket_other_freeform_through = nx.Graph()
+        for i in range(1, n+1):
+            G_pocket_other_freeform_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No')
+            # Connect to the previous wall
+            if i > 1:
+                G_pocket_other_freeform_through.add_edge(i, i - 1, edge_type='concave')
+            #last wall doesnt connect with 1st
+
+
+        return G_pocket_freeform_blind, G_pocket_freeform_through, G_pocket_other_freeform_through
 
     def is_conjoined_pocket(self, candidate_graph, candidate_nodes):
         n = len(candidate_nodes)
-        if n < 5: return False
+        if n < 5: return False, 0
 
+        #BLIND
         # 1. Identify the Base Node (highest degree)
         # In a conjoined pocket, the floor is connected to all walls.
         degrees = dict(candidate_graph.degree())
         base_node = max(degrees, key=degrees.get)
         if degrees[base_node] != n - 1:
-            return False
+            return False, 0
 
         # 2. Check Edge Count Rule
-        # We solve for 'p' (number of pockets): p = 2(n-1) - Edges
+        # We solve for 'p' (nr of pockets): p = 2(n-1) - Edges
         num_edges = candidate_graph.number_of_edges()
         p = (2 * (n - 1)) - num_edges
 
@@ -254,7 +268,11 @@ class FeatureRecognition:
             # Every wall connects to the base
             G_slot_freeform_through.add_edge(0, i, edge_type='concave')
 
-        return G_slot_freeform_through
+        #SINGLE FACE -> SLOT
+        G_slot_freeform_face = nx.Graph()
+        G_slot_freeform_face.add_node(0, face_type='Plane', geometry='Plane', stock_face='No')
+
+        return G_slot_freeform_through, G_slot_freeform_face
 
 
 
@@ -266,16 +284,19 @@ class FeatureRecognition:
         feature_candidates = self.subgraphs_info
         self.matches = []
 
-        for candidate_info in feature_candidates:  # Renamed for clarity
+        for candidate_info in feature_candidates:
             candidate_idx = candidate_info['subgraph_idx']
             candidate_graph = candidate_info['subgraph']
             candidate_nodes = candidate_info['nodes']
             n_candidate_concave = candidate_info['n_concave']
             matched = False
+            n_nodes = len(candidate_nodes)
 
             node_match = nx.algorithms.isomorphism.categorical_node_match('face_type', None)
             edge_match = nx.algorithms.isomorphism.categorical_edge_match('edge_type', None)
 
+
+            #1. Library
             for name, pattern in self.lib.features.items():
                 if nx.is_isomorphic(candidate_graph, pattern, node_match=node_match, edge_match=edge_match):
                     self.matches.append({'feature_type': name, 'node_indices': candidate_nodes})
@@ -283,91 +304,48 @@ class FeatureRecognition:
                     print(f"MATCH! Feature {self.matches[-1]['feature_type']} found")
                     break
 
-            # If no library match, try the other ones
+            #2. Free-Form Pockets
             if not matched:
-                n_nodes = len(candidate_nodes)
-                G_pocket_freeform_blind, G_pocket_freeform_through = self.build_free_form_pocket(n_nodes)
-
-                if nx.is_isomorphic(candidate_graph, G_pocket_freeform_blind, node_match=node_match,
-                                            edge_match=edge_match):
-                    self.matches.append({
-                        'feature_type': f'feat_pocket_blind',
-                        'node_indices': candidate_nodes,
-                    })
+                G_blind, G_thru, G_other = self.build_free_form_pocket(n_nodes)
+                # Check Blind
+                if nx.is_isomorphic(candidate_graph, G_blind, node_match=node_match, edge_match=edge_match):
+                    self.matches.append({'feature_type': 'feat_pocket_blind', 'node_indices': candidate_nodes})
                     matched = True
                     print(f"MATCH! Free-form blind pocket with {n_nodes} faces found.")
 
-
-                elif nx.is_isomorphic(candidate_graph, G_pocket_freeform_through, node_match=node_match,
-                edge_match=edge_match):
-                    self.matches.append({
-                        'feature_type': f'feat_pocket_through',
-                        'node_indices': candidate_nodes,
-                    })
+                # Check Through (Both closed and open loop variations)
+                elif (nx.is_isomorphic(candidate_graph, G_thru, node_match=node_match, edge_match=edge_match) or
+                      nx.is_isomorphic(candidate_graph, G_other, node_match=node_match, edge_match=edge_match)):
+                    self.matches.append({'feature_type': 'feat_pocket_through', 'node_indices': candidate_nodes})
                     matched = True
                     print(f"MATCH! Free-form through pocket with {n_nodes} faces found.")
 
-
+            # 3. Free Form Slots
             if not matched:
-                n_nodes = len(candidate_nodes)
-                G_slot_freeform_through= self.build_free_form_slot(n_nodes)
-
-                if nx.is_isomorphic(candidate_graph, G_slot_freeform_through, node_match=node_match,
-                                            edge_match=edge_match):
-                    self.matches.append({
-                        'feature_type': f'feat_slot_through',
-                        'node_indices': candidate_nodes,
-                    })
+                G_slot, G_face = self.build_free_form_slot(n_nodes)
+                if nx.is_isomorphic(candidate_graph, G_slot, node_match=node_match, edge_match=edge_match):
+                    self.matches.append({'feature_type': 'feat_slot_through', 'node_indices': candidate_nodes})
+                    matched = True
+                    print(f"MATCH! Free-form through slot with {n_nodes} faces found.")
+                elif nx.is_isomorphic(candidate_graph, G_face, node_match=node_match, edge_match=edge_match):
+                    self.matches.append({'feature_type': 'feat_slot_through', 'node_indices': candidate_nodes})
                     matched = True
                     print(f"MATCH! Free-form through slot with {n_nodes} faces found.")
 
-
-
+            # 4. Conjoined Pockets
             if not matched:
-                # Try the Rule-Based approach for Conjoined Pockets
-                is_conjoined, num_pockets = self.is_conjoined_pocket(candidate_graph, candidate_nodes)
-
+                is_conjoined, num_pockets= self.is_conjoined_pocket(candidate_graph, candidate_nodes)
                 if is_conjoined:
                     self.matches.append({
-                        'feature_type': f'feat_pocket_blind',
-                        'node_indices': candidate_nodes,
-                        'num_sub_features': num_pockets
-                    })
-                    print(f"MATCH! Conjoined feature found with {num_pockets} pockets.")
+                            'feature_type': f'feat_pocket_blind',
+                            'node_indices': candidate_nodes,
+                            'num_sub_features': num_pockets})
                     matched = True
+                    print(f"MATCH! Conjoined feature found with {num_pockets} pockets.")
 
-
+            # 5. Unrecognized
             if not matched:
                 print(f"Candidate {candidate_idx} still unrecognized.")
-
-
-
-            '''for name, pattern in self.lib.features.items():
-                print(f"\nChecking if candidate {candidate_idx} matches {name}")
-                print(f"  Candidate nodes: {len(candidate_nodes)}, Pattern nodes: {len(pattern.nodes())}")
-                print(f"  Candidate edges: {n_candidate_concave}, Pattern edges: {len(pattern.edges())}")
-
-                node_match = nx.algorithms.isomorphism.categorical_node_match('face_type', None)
-                edge_match = nx.algorithms.isomorphism.categorical_edge_match('edge_type', None)
-
-                # use graph here
-                if nx.is_isomorphic(candidate_graph, pattern, node_match=node_match, edge_match=edge_match):
-                    self.matches.append({
-                        'feature_type': name,
-                        'node_indices': candidate_nodes,
-                    })
-                    print(f"MATCH! Feature {self.matches[-1]['feature_type']} found")
-                    break  # Stop checking other patterns for this candidate
-                else:
-                    G_pocket_freeform = self.build_free_form_pocket(len(candidate_nodes))
-                    if nx.is_isomorphic(candidate_graph, G_pocket_freeform, node_match=node_match, edge_match=edge_match):
-                        self.matches.append({
-                            'feature_type': "Free Form Pocket",
-                            'node_indices': candidate_nodes,
-                        })
-                        print(f"MATCH! Feature {self.matches[-1]['feature_type']} found")
-                else:
-                    print(f"NO match")'''
 
         print(f"\n=== FINAL RESULTS ===")
         print(f"Total matches: {len(self.matches)}")

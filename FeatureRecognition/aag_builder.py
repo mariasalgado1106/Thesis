@@ -454,27 +454,37 @@ class AAGBuilder_2D:
         if self.G is None:
             self.build_aag_graph()
         def filter_stock_faces(node):
-            return self.G.nodes[node].get("stock_face") != "Yes"
+            return self.G.nodes[node].get("stock_face") == "No"
         def filter_edge(n1, n2): #n1 and n2 are the 2 nodes
             return self.G[n1][n2].get("edge_type") != "convex" #if convex it returns false and removes
-        self.subG = nx.subgraph_view(self.G, filter_node=filter_stock_faces, filter_edge=filter_edge)
-        #this only created the view of the graph, not actually removing those nodes
+        # 1. Create the view based on stock filtering and edge type
+        view = nx.subgraph_view(self.G, filter_node=filter_stock_faces, filter_edge=filter_edge)
 
-        #make sure planar faces by themselves are removed
-        nodes_to_keep = set()
-        for component in nx.connected_components(self.subG):
-            sg = self.subG.subgraph(component)
-            # Keep if: has edges OR is a cylinder (potential through-hole)
-            if sg.number_of_edges() > 0:
-                nodes_to_keep.update(component)
+        # 2. Identify nodes to keep
+        nodes_to_keep = []
+        for component in nx.connected_components(view):
+            # In a subgraph view, 'component' is a set of nodes
+            # that are connected by concave/tangent edges.
+            if len(component) > 1:
+                # If nodes are connected by concave edges, they are definitely a feature
+                nodes_to_keep.extend(component)
             else:
-                # Single isolated node - only keep if it's a cylinder
-                node = list(component)[0]
-                if self.G.nodes[node].get('face_type') == 'Cylinder':
-                    nodes_to_keep.add(node)
+                # It's an isolated node (no concave/tangent neighbors)
+                node_idx = list(component)[0]
+                node_data = self.G.nodes[node_idx]
+
+                # Keep isolated nodes if they are:
+                # A) Cylinders (Through holes often have no concave edges)
+                # B) Planes that were NOT stock faces (Single-face features like a shallow step)
+                if node_data.get('face_type') == 'Cylinder':
+                    nodes_to_keep.append(node_idx)
+                elif node_data.get('face_type') == 'Plane':
+                    # Since filter_stock_faces already removed "Yes" faces,
+                    # any plane left here is a non-stock planar face.
+                    nodes_to_keep.append(node_idx)
 
         # Create final filtered subgraph
-        self.subG = self.subG.subgraph(nodes_to_keep).copy()
+        self.subG = view.subgraph(nodes_to_keep).copy()
 
         return self.subG
 

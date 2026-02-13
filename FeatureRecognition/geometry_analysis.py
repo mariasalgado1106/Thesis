@@ -72,6 +72,42 @@ def get_face_geometry(face):
         return "Other", None
 
 
+def define_stock_face(face_data, xmin, ymin, zmin, xmax, ymax, zmax, tol=0.1):
+    # Rule 1: Only Planes can be stock faces
+    if face_data["type"] != "Plane":
+        return "No"
+
+    # Rule 2: It must have NO concave neighbors
+    # (Stock faces are the "outermost" shell; concave edges imply an internal feature)
+    if len(face_data['concave_adjacent']) > 0:
+        return "No"
+
+    # Rule 3: The face center must lie on the Bounding Box boundary
+    cx, cy, cz = face_data["face_center"]
+    n_axis = face_data["normal_vector_axis"]
+
+    # Match the Axis to the Boundary
+    # A stock face on the +X side must have a normal pointing to +x
+    match n_axis:
+        case "x":
+            return "Yes" if abs(cx - xmax) < tol else "No"
+        case "-x":
+            return "Yes" if abs(cx - xmin) < tol else "No"
+        case "y":
+            return "Yes" if abs(cy - ymax) < tol else "No"
+        case "-y":
+            return "Yes" if abs(cy - ymin) < tol else "No"
+        case "z":
+            return "Yes" if abs(cz - zmax) < tol else "No"
+        case "-z":
+            return "Yes" if abs(cz - zmin) < tol else "No"
+        case _:
+            return "No"
+
+
+
+
+'''
 def define_stock_face(face_data):
     # Plane and has NO concave neighbors, it's a Stock Face
     if face_data["type"] != "Plane":
@@ -81,26 +117,8 @@ def define_stock_face(face_data):
         return "Yes"
     else:
         return "No"
+'''
 
-
-
-    '''
-    xmin, ymin, zmin, xmax, ymax, zmax, stock_box_center = get_stock_box(shape, 1e-6)
-    face_center_coords, _ = get_face_center(face)
-    x, y, z = face_center_coords
-    
-    face_xmin = abs(x - xmin) <= tol
-    face_xmax = abs(x - xmax) <= tol
-    face_ymin = abs(y - ymin) <= tol
-    face_ymax = abs(y - ymax) <= tol
-    face_zmin = abs(z - zmin) <= tol
-    face_zmax = abs(z - zmax) <= tol
-
-    if face_xmin or face_xmax or face_ymin or face_ymax or face_zmin or face_zmax:
-        return "Yes"
-    else:
-        return "No"
-    '''
 
 def normal_vector_face (face, shape):
     _, _, _, _, _, _, stock_box_center = get_stock_box(shape, 1e-6)
@@ -123,7 +141,7 @@ def normal_vector_face (face, shape):
     n.Normalize()
 
     # direction vector from face_center to stock center
-    vv = gp_Vec(stock_box_center.XYZ() - face_center.XYZ())
+    vv = gp_Vec(face_center.XYZ() - stock_box_center.XYZ())
 
     #normal to be consistent toward box center
     if n.Dot(vv) < 0:
@@ -395,11 +413,13 @@ def analyze_shape(my_shape):
                     face_data['tangent_adjacent'].append(adj_index)
 
     # 5. FINAL PASS: Determine Stock Faces
-    # =========================================================
-    # Now that 'concave_adjacent' is populated, we can check it safely.
+    xmin, ymin, zmin, xmax, ymax, zmax, _ = get_stock_box(my_shape)
 
     for face_data in face_data_list:
-        face_data["stock_face"] = define_stock_face(face_data)
+        # Pass the bbox limits to the detection function
+        face_data["stock_face"] = define_stock_face(
+            face_data, xmin, ymin, zmin, xmax, ymax, zmax
+        )
 
     return all_faces, face_data_list, analyser, all_edges, edge_data_list
 
