@@ -286,55 +286,120 @@ class FeatureRecognition:
 
         print(f"\n=== IDENTIFY FEATURES ===")
         print(f"Total connected components: {len(self.subgraphs_info)}")
-
+        from networkx.algorithms import isomorphism
         feature_candidates = self.subgraphs_info
         self.matches = []
+        feat_found = 0
+
+        # Setup matching criteria
+        node_match = isomorphism.categorical_node_match('face_type', None)
+        edge_match = isomorphism.categorical_edge_match('edge_type', None)
 
         for candidate_info in feature_candidates:
             candidate_idx = candidate_info['subgraph_idx']
             candidate_graph = candidate_info['subgraph']
             candidate_nodes = candidate_info['nodes']
-            n_candidate_concave = candidate_info['n_concave']
-            matched = False
             n_nodes = len(candidate_nodes)
-
-            node_match = nx.algorithms.isomorphism.categorical_node_match('face_type', None)
-            edge_match = nx.algorithms.isomorphism.categorical_edge_match('edge_type', None)
-
+            matched = False
 
             #1. Library
             for name, pattern in self.lib.features.items():
-                if nx.is_isomorphic(candidate_graph, pattern, node_match=node_match, edge_match=edge_match):
-                    self.matches.append({'feature_type': name, 'node_indices': candidate_nodes})
+                gm = isomorphism.GraphMatcher(candidate_graph, pattern,
+                                              node_match=node_match, edge_match=edge_match)
+                if gm.is_isomorphic():
+                    tad_faces = [cand_node for cand_node, patt_node in gm.mapping.items()
+                                 if pattern.nodes[patt_node].get('role') == 'base']
+                    feat_found = feat_found + 1
+                    self.matches.append({
+                        'feat_idx': feat_found,
+                        'feature_type': name,
+                        'node_indices': candidate_nodes,
+                        'tad_faces': tad_faces
+                    })
                     matched = True
-                    print(f"MATCH! Feature {self.matches[-1]['feature_type']} found")
+                    print(f"MATCH! Feature {name} found")
                     break
 
             #2. Free-Form Pockets
             if not matched:
                 G_blind, G_thru, G_other = self.build_free_form_pocket(n_nodes)
+                gm_blind = isomorphism.GraphMatcher(candidate_graph, G_blind,node_match=node_match,
+                                              edge_match=edge_match)
+                gm_thru = isomorphism.GraphMatcher(candidate_graph, G_thru, node_match=node_match,
+                                                    edge_match=edge_match)
+                gm_other = isomorphism.GraphMatcher(candidate_graph, G_other, node_match=node_match,
+                                                    edge_match=edge_match)
                 # Check Blind
-                if nx.is_isomorphic(candidate_graph, G_blind, node_match=node_match, edge_match=edge_match):
-                    self.matches.append({'feature_type': 'feat_pocket_blind', 'node_indices': candidate_nodes})
+                if gm_blind.is_isomorphic():
+                    tad_faces = [cand_node for cand_node, patt_node in gm_blind.mapping.items()
+                                 if G_blind.nodes[patt_node].get('role') == 'base']
+                    feat_found = feat_found + 1
+                    self.matches.append({
+                        'feat_idx': feat_found,
+                        'feature_type': 'feat_pocket_blind',
+                        'node_indices': candidate_nodes,
+                        'tad_faces': tad_faces
+                    })
                     matched = True
                     print(f"MATCH! Free-form blind pocket with {n_nodes} faces found.")
 
-                # Check Through (Both closed and open loop variations)
-                elif (nx.is_isomorphic(candidate_graph, G_thru, node_match=node_match, edge_match=edge_match) or
-                      nx.is_isomorphic(candidate_graph, G_other, node_match=node_match, edge_match=edge_match)):
-                    self.matches.append({'feature_type': 'feat_pocket_through', 'node_indices': candidate_nodes})
+                # Check Through
+                elif gm_thru.is_isomorphic():
+                    tad_faces = [cand_node for cand_node, patt_node in gm_thru.mapping.items()
+                                 if G_thru.nodes[patt_node].get('role') == 'base']
+                    feat_found = feat_found + 1
+                    self.matches.append({
+                        'feat_idx': feat_found,
+                        'feature_type': 'feat_pocket_through',
+                        'node_indices': candidate_nodes,
+                        'tad_faces': tad_faces
+                    })
+                    matched = True
+                    print(f"MATCH! Free-form through pocket with {n_nodes} faces found.")
+
+                # Check Other
+                elif gm_other.is_isomorphic():
+                    tad_faces = [cand_node for cand_node, patt_node in gm_other.mapping.items()
+                                 if G_other.nodes[patt_node].get('role') == 'base']
+                    feat_found = feat_found + 1
+                    self.matches.append({
+                        'feat_idx': feat_found,
+                        'feature_type': 'feat_pocket_through',
+                        'node_indices': candidate_nodes,
+                        'tad_faces': tad_faces
+                    })
                     matched = True
                     print(f"MATCH! Free-form through pocket with {n_nodes} faces found.")
 
             # 3. Free Form Slots
             if not matched:
                 G_slot, G_face = self.build_free_form_slot(n_nodes)
-                if nx.is_isomorphic(candidate_graph, G_slot, node_match=node_match, edge_match=edge_match):
-                    self.matches.append({'feature_type': 'feat_slot_through', 'node_indices': candidate_nodes})
+                gm_slot = isomorphism.GraphMatcher(candidate_graph, G_slot, node_match=node_match,
+                                                    edge_match=edge_match)
+                gm_face = isomorphism.GraphMatcher(candidate_graph, G_face, node_match=node_match,
+                                                   edge_match=edge_match)
+                if gm_slot.is_isomorphic():
+                    tad_faces = [cand_node for cand_node, patt_node in gm_slot.mapping.items()
+                                 if G_slot.nodes[patt_node].get('role') == 'base']
+                    feat_found = feat_found + 1
+                    self.matches.append({
+                        'feat_idx': feat_found,
+                        'feature_type': 'feat_slot_through',
+                        'node_indices': candidate_nodes,
+                        'tad_faces': tad_faces
+                    })
                     matched = True
                     print(f"MATCH! Free-form through slot with {n_nodes} faces found.")
-                elif nx.is_isomorphic(candidate_graph, G_face, node_match=node_match, edge_match=edge_match):
-                    self.matches.append({'feature_type': 'feat_slot_through', 'node_indices': candidate_nodes})
+                elif gm_face.is_isomorphic():
+                    tad_faces = [cand_node for cand_node, patt_node in gm_face.mapping.items()
+                                 if G_face.nodes[patt_node].get('role') == 'base']
+                    feat_found = feat_found + 1
+                    self.matches.append({
+                        'feat_idx': feat_found,
+                        'feature_type': 'feat_slot_through',
+                        'node_indices': candidate_nodes,
+                        'tad_faces': tad_faces
+                    })
                     matched = True
                     print(f"MATCH! Free-form through slot with {n_nodes} faces found.")
 
@@ -342,10 +407,14 @@ class FeatureRecognition:
             if not matched:
                 is_conjoined, num_pockets, base_node= self.is_conjoined_pocket(candidate_graph, candidate_nodes)
                 if is_conjoined:
+                    feat_found = feat_found + 1
                     self.matches.append({
-                            'feature_type': f'feat_pocket_blind',
-                            'node_indices': candidate_nodes,
-                            'num_sub_features': num_pockets})
+                        'feat_idx': feat_found,
+                        'feature_type': 'feat_pocket_blind',
+                        'node_indices': candidate_nodes,
+                        'tad_faces': [base_node],
+                        'num_sub_features': num_pockets
+                    })
                     matched = True
                     print(f"MATCH! Conjoined feature found with {num_pockets} pockets.")
 
@@ -354,9 +423,17 @@ class FeatureRecognition:
                 print(f"Candidate {candidate_idx} still unrecognized.")
 
         print(f"\n=== FINAL RESULTS ===")
-        print(f"Total matches: {len(self.matches)}")
-        for match in self.matches:
-            print(f"  {match['feature_type']}: nodes {match['node_indices']}")
+        print("\n" + "=" * 60)
+        print(f"{'ID':<5} | {'Feature Type':<25} | {'Base Faces (TAD)':<15}")
+        print("-" * 60)
+
+        for m in self.matches:
+            # Format the list of faces as a string for cleaner printing
+            base_str = ", ".join(map(str, m['tad_faces'])) if m['tad_faces'] else "None"
+
+            print(f"{m['feat_idx']:<5} | {m['feature_type']:<25} | {base_str:<15}")
+
+        print("=" * 60 + "\n")
 
         return self.matches
 
