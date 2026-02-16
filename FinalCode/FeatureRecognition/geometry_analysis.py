@@ -30,6 +30,8 @@ from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Core.TopLoc import TopLoc_Location
 from OCC.Core.BRep import BRep_Tool
 
+from OCC.Core.gp import gp_Dir
+
 
 
 def load_step_file(step_file):
@@ -105,21 +107,6 @@ def define_stock_face(face_data, xmin, ymin, zmin, xmax, ymax, zmax, tol=0.1):
             return "No"
 
 
-
-
-'''
-def define_stock_face(face_data):
-    # Plane and has NO concave neighbors, it's a Stock Face
-    if face_data["type"] != "Plane":
-        return "No"
-
-    if len(face_data['concave_adjacent']) == 0:
-        return "Yes"
-    else:
-        return "No"
-'''
-
-
 def normal_vector_face (face, shape):
     _, _, _, _, _, _, stock_box_center = get_stock_box(shape, 1e-6)
     _, face_center = get_face_center(face)
@@ -168,6 +155,16 @@ def normal_vector_face (face, shape):
 
     n_axis = normal_axis_direction(n_coords, tol=1e-3)
     return n, n_coords, n_axis
+
+def get_cylinder_axis(face):
+    adaptor = BRepAdaptor_Surface(face, True)
+    if adaptor.GetType() == GeomAbs_Cylinder:
+        cyl = adaptor.Cylinder()
+        axis_dir = cyl.Axis().Direction() # This is the gp_Dir object
+        axis_coords = [axis_dir.X(), axis_dir.Y(), axis_dir.Z()]
+        return axis_dir, axis_coords
+    return None, None
+
 
 
 def get_face_center (face):
@@ -308,6 +305,7 @@ def analyze_shape(my_shape):
         face_center, _ = get_face_center(face)
 
         n, n_coords, n_axis = normal_vector_face(face, my_shape)
+        axis_obj, axis_coords = get_cylinder_axis(face)
         vertices, triangles = triangulate_face(face, linear_deflection) #mesh triangulation
         face_data_list.append({
             "index": i,
@@ -323,6 +321,8 @@ def analyze_shape(my_shape):
             "normal_vector": n,
             "normal_vector_coords": n_coords,
             "normal_vector_axis": n_axis,
+            "cylinder_axis": axis_obj,
+            "cylinder_axis_coords": axis_coords,
             "mesh_vertices": vertices,
             "mesh_triangles": triangles
         })
@@ -425,21 +425,38 @@ def analyze_shape(my_shape):
 
 
 def print_face_analysis_table(all_faces, face_data_list):
+    def get_axis_label(coords, tol=1e-3):
+        if coords is None:
+            return "N/A"
+        nx, ny, nz = coords
+        if abs(nx - 1.0) < tol: return "x"
+        if abs(nx + 1.0) < tol: return "-x"
+        if abs(ny - 1.0) < tol: return "y"
+        if abs(ny + 1.0) < tol: return "-y"
+        if abs(nz - 1.0) < tol: return "z"
+        if abs(nz + 1.0) < tol: return "-z"
+        return "Other"
+
     print("\n--- Model Face Analysis Table ---")
     print(f"Total faces found: {len(all_faces)}")
     print("-------------------------------------------------------------------")
-    print(f"{'Face #':<3} | {'Type':<8} |{'Stock Face':<10} | {'Normal':<6} | {'Adjacent':<15} | {'Convex':<15} | {'Concave':<15} | {'Tangent'}")
-    print("-" * 95)
+    # I renamed the column header to "Dir/Axis" to reflect that it shows Normal OR Cylinder Axis
+    print(f"{'Face #':<6} | {'Type':<10} | {'Stock':<6} | {'Dir/Axis':<8} | {'Concave':<15} | {'Adjacent'}")
+    print("-" * 105)
 
     for face_data in face_data_list:
-        print(f"{face_data['index']:<3} | "
+        # LOGIC: If it's a cylinder, use the Cylinder Axis label. Otherwise, use the Normal Axis label.
+        if face_data['type'] == "Cylinder":
+            display_axis = get_axis_label(face_data['cylinder_axis_coords'])
+        else:
+            display_axis = face_data['normal_vector_axis']
+
+        print(f"{face_data['index']:<6} | "
               f"{face_data['type']:<10} | "
-              f"{face_data['stock_face']:<10} | "
-              f"{face_data['normal_vector_axis']:<6} | "
-              f"{str(face_data['adjacent_indices']):<15} | "
-              f"{str(face_data['convex_adjacent']):<15} | "
+              f"{face_data['stock_face']:<6} | "
+              f"{display_axis:<8} | "
               f"{str(face_data['concave_adjacent']):<15} | "
-              f"{face_data['tangent_adjacent']}")
+              f"{str(face_data['adjacent_indices'])}")
 
     print("-------------------------------------------------------------------\n")
 

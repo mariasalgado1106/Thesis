@@ -17,7 +17,7 @@ def main():
     display, start_display, add_menu, add_function_to_menu = init_display()
 
     # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "Part3.stp"))
+    my_shape = load_step_file(os.path.join("STEPFiles", "example4.stp"))
     if not my_shape:
         return
 
@@ -42,7 +42,7 @@ def main():
     choice = input(
             "Visualize: "
             "(0) Features,"
-            "(1) , "
+            "(1) TADs 3D Volumetric, "
             "[0/1]: "
         )
 
@@ -53,6 +53,8 @@ def main():
             show_face_centers=True,
             show_edges=True
         )
+
+
 
     start_display()
 
