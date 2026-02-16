@@ -1,9 +1,10 @@
 from OCC.Display.SimpleGui import init_display
 import os
 
-from FeatureRecognition.feature_recognition import FeatureRecognition
+from FeatureRecognition.feature_recognition import FeatureRecognition, FeatureLibrary
 from FeatureRecognition.part_visualizer_occ import PartVisualizer_occ
 from FeatureRecognition.part_vizualizer_plotly import Part_Visualizer
+from FeatureRecognition.aag_builder import AAGBuilder_2D, AAGBuilder_3D
 from FeatureRecognition.geometry_analysis import (
     load_step_file,
     analyze_shape,
