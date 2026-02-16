@@ -23,10 +23,33 @@ def main():
 
 
     # Feature Recognition
-    print("\nPART 3: FEATURE RECOGNITION")
+    print("\nFEATURE RECOGNITION")
     recognizer = FeatureRecognition(my_shape)
     features = recognizer.identify_features()
     # stats
     print(f"Detected {len(features)} features")
     for f in features:
         print(f["feature_type"], f["node_indices"])
+
+
+    # Visualize results
+    print("\n VISUALIZATION")
+    choice = input(
+            "Visualize: "
+            "(0) Features,"
+            "(1) , "
+            "[0/1]: "
+        )
+
+
+    if choice in ["0"]:  # features
+        recognizer.visualize_features_3d(
+            show_mesh=True,
+            show_face_centers=True,
+            show_edges=True
+        )
+
+    start_display()
+
+if __name__ == "__main__":
+    main()
