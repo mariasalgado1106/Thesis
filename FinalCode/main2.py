@@ -35,6 +35,7 @@ def main():
     #TAD
     extractor = TAD_Extraction(my_shape)
     extractor.print_tad_table()
+    extractor.print_grouped_tads()
 
 
     # Visualize results
