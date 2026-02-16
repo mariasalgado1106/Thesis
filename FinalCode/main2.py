@@ -8,9 +8,9 @@ from FeatureRecognition.aag_builder import AAGBuilder_2D, AAGBuilder_3D
 from FeatureRecognition.geometry_analysis import (
     load_step_file,
     analyze_shape,
-    print_face_analysis_table,
-    print_edge_analysis_table
 )
+
+from SetupPlanning.TADs import TAD_Extraction
 
 def main():
     # Initialize display
@@ -30,6 +30,11 @@ def main():
     print(f"Detected {len(features)} features")
     for f in features:
         print(f["feature_type"], f["node_indices"])
+
+
+    #TAD
+    extractor = TAD_Extraction(my_shape)
+    extractor.print_tad_table()
 
 
     # Visualize results

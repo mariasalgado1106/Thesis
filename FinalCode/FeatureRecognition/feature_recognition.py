@@ -422,7 +422,7 @@ class FeatureRecognition:
             if not matched:
                 print(f"Candidate {candidate_idx} still unrecognized.")
 
-        print(f"\n=== FINAL RESULTS ===")
+        '''print(f"\n=== FINAL RESULTS ===")
         print("\n" + "=" * 60)
         print(f"{'ID':<5} | {'Feature Type':<25} | {'Base Faces (TAD)':<15}")
         print("-" * 60)
@@ -433,7 +433,7 @@ class FeatureRecognition:
 
             print(f"{m['feat_idx']:<5} | {m['feature_type']:<25} | {base_str:<15}")
 
-        print("=" * 60 + "\n")
+        print("=" * 60 + "\n")'''
 
         return self.matches
 

@@ -140,10 +140,10 @@ def normal_vector_face (face, shape):
         return 0.0, 0.0, 0.0
     n.Normalize()
 
-    # direction vector from face_center to stock center
+    # direction vector (OUTWARD)
     vv = gp_Vec(face_center.XYZ() - stock_box_center.XYZ())
 
-    #normal to be consistent toward box center
+    #normal to be consistent
     if n.Dot(vv) < 0:
         n = gp_Vec(-n.X(), -n.Y(), -n.Z())
 
