@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 from FeatureRecognition.aag_builder import AAGBuilder_2D, AAGBuilder_3D
 from FeatureRecognition.geometry_analysis import load_step_file, analyze_shape
 from FeatureRecognition.part_vizualizer_plotly import Part_Visualizer
+from networkx.generators.harary_graph import hkn_harary_graph
 
 
 class FeatureLibrary:
@@ -177,6 +178,7 @@ class FeatureRecognition:
     def __init__(self, my_shape):
         self.aag = AAGBuilder_2D(my_shape)
         self.subgraphs_info = self.aag.analyse_subgraphs()
+        self.subgraphs_info_2 = self.aag.analyse_subgraphs_not_all()
         self.colors_rgb = self.aag.colors_rgb
         self.shape = my_shape
         (self.all_faces, self.face_data_list, self.analyser, self.all_edges,
@@ -236,9 +238,13 @@ class FeatureRecognition:
 
         return G_pocket_freeform_blind, G_pocket_freeform_through, G_pocket_other_freeform_through
 
+    # Conjoined Pockets: 1 base node connected to n-1 nodes, that are all connected in a loop
+    # (concave & convex)
+    # all nodes are planes
+
     def is_conjoined_pocket(self, candidate_graph, candidate_nodes):
         n = len(candidate_nodes)
-        if n < 5: return False, 0
+        if n < 5: return False, 0, 0
 
         #BLIND
         # 1. Identify the Base Node (highest degree)
@@ -246,7 +252,7 @@ class FeatureRecognition:
         degrees = dict(candidate_graph.degree())
         base_node = max(degrees, key=degrees.get)
         if degrees[base_node] != n - 1:
-            return False, 0
+            return False, 0, 0
 
         # 2. Check Edge Count Rule
         # We solve for 'p' (nr of pockets): p = 2(n-1) - Edges
@@ -256,7 +262,43 @@ class FeatureRecognition:
         # If p > 1, it's likely a conjoined pocket
         if p >= 2:
             return True, p, base_node
-        return False, 0
+        return False, 0, 0
+
+    def build_conjoined_pocket(self, n):
+        if n < 4:
+            # Return empty graphs so nx.is_isomorphic will naturally fail
+            return nx.Graph(), nx.Graph(), nx.Graph()
+
+        # BLIND
+        G_conjoined_pocket_blind = nx.Graph()
+        # base node
+        G_conjoined_pocket_blind.add_node(0, face_type='Plane', geometry='Plane', stock_face='No', role='base')
+        # walls 1 -> n-1
+        for i in range(1, n):
+            G_conjoined_pocket_blind.add_node(i, face_type='Plane', geometry='Plane', stock_face='No', role='wall')
+            # Every wall connects to the base
+            G_conjoined_pocket_blind.add_edge(0, i, edge_type='concave')
+
+            # Connect to the previous wall
+            if i > 1:
+                G_conjoined_pocket_blind.add_edge(i, i - 1)
+
+        # last wall must connect back to the first wall (node 1)
+        if n > 2:
+            G_conjoined_pocket_blind.add_edge(n - 1, 1)
+
+        # THROUGH -> NO BASE NODE
+        G_conjoined_pocket_through = nx.Graph()
+        for i in range(1, n + 1):
+            G_conjoined_pocket_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No', role='wall')
+            # Connect to the previous wall
+            if i > 1:
+                G_conjoined_pocket_through.add_edge(i, i - 1)
+        # last wall must connect back to the first wall (node 1)
+        if n > 2:
+            G_conjoined_pocket_through.add_edge(n, 1)
+
+        return G_conjoined_pocket_blind, G_conjoined_pocket_through
 
     # Free Form Slot: 1 base node connected to n-1 nodes
     # all nodes are planes
@@ -266,19 +308,15 @@ class FeatureRecognition:
         # base node
         G_slot_freeform_through.add_node(0, face_type='Plane', geometry='Plane',
                                          stock_face='No', role='base')
+        if n>1:
         # walls 1 -> n-1
-        for i in range(1, n):
-            G_slot_freeform_through.add_node(i, face_type='Plane', geometry='Plane',
+            for i in range(1, n):
+                G_slot_freeform_through.add_node(i, face_type='Plane', geometry='Plane',
                                              stock_face='No', role='wall')
             # Every wall connects to the base
-            G_slot_freeform_through.add_edge(0, i, edge_type='concave')
+                G_slot_freeform_through.add_edge(0, i, edge_type='concave')
 
-        #SINGLE FACE -> SLOT
-        G_slot_freeform_face = nx.Graph()
-        G_slot_freeform_face.add_node(0, face_type='Plane', geometry='Plane',
-                                      stock_face='No', role='wall')
-
-        return G_slot_freeform_through, G_slot_freeform_face
+        return G_slot_freeform_through
 
 
 
@@ -288,13 +326,17 @@ class FeatureRecognition:
         print(f"Total connected components: {len(self.subgraphs_info)}")
         from networkx.algorithms import isomorphism
         feature_candidates = self.subgraphs_info
+        feature_candidates_2 = self.subgraphs_info_2
         self.matches = []
         feat_found = 0
+        matched_node_indices = set()
+        check_conjoined_pocket = set()
 
         # Setup matching criteria
         node_match = isomorphism.categorical_node_match('face_type', None)
         edge_match = isomorphism.categorical_edge_match('edge_type', None)
 
+        # 1. First Pass (NON-CONVEX EDGES)
         for candidate_info in feature_candidates:
             candidate_idx = candidate_info['subgraph_idx']
             candidate_graph = candidate_info['subgraph']
@@ -317,6 +359,7 @@ class FeatureRecognition:
                         'tad_faces': tad_faces
                     })
                     matched = True
+                    matched_node_indices.update(candidate_nodes)
                     #print(f"MATCH! Feature {name} found")
                     break
 
@@ -341,6 +384,7 @@ class FeatureRecognition:
                         'tad_faces': tad_faces
                     })
                     matched = True
+                    matched_node_indices.update(candidate_nodes)
                     #print(f"MATCH! Free-form blind pocket with {n_nodes} faces found.")
 
                 # Check Through
@@ -355,29 +399,21 @@ class FeatureRecognition:
                         'tad_faces': tad_faces
                     })
                     matched = True
+                    matched_node_indices.update(candidate_nodes)
                     #print(f"MATCH! Free-form through pocket with {n_nodes} faces found.")
 
                 # Check Other
                 elif gm_other.is_isomorphic():
                     tad_faces = [cand_node for cand_node, patt_node in gm_other.mapping.items()
                                  if G_other.nodes[patt_node].get('role') == 'base']
-                    feat_found = feat_found + 1
-                    self.matches.append({
-                        'feat_idx': feat_found,
-                        'feature_type': 'feat_pocket_through',
-                        'node_indices': candidate_nodes,
-                        'tad_faces': tad_faces
-                    })
-                    matched = True
+                    check_conjoined_pocket.update(candidate_nodes)
                     #print(f"MATCH! Free-form through pocket with {n_nodes} faces found.")
 
             # 3. Free Form Slots
             if not matched:
-                G_slot, G_face = self.build_free_form_slot(n_nodes)
+                G_slot = self.build_free_form_slot(n_nodes)
                 gm_slot = isomorphism.GraphMatcher(candidate_graph, G_slot, node_match=node_match,
                                                     edge_match=edge_match)
-                gm_face = isomorphism.GraphMatcher(candidate_graph, G_face, node_match=node_match,
-                                                   edge_match=edge_match)
                 if gm_slot.is_isomorphic():
                     tad_faces = [cand_node for cand_node, patt_node in gm_slot.mapping.items()
                                  if G_slot.nodes[patt_node].get('role') == 'base']
@@ -389,38 +425,84 @@ class FeatureRecognition:
                         'tad_faces': tad_faces
                     })
                     matched = True
-                    #print(f"MATCH! Free-form through slot with {n_nodes} faces found.")
-                elif gm_face.is_isomorphic():
-                    tad_faces = [cand_node for cand_node, patt_node in gm_face.mapping.items()
-                                 if G_face.nodes[patt_node].get('role') == 'base']
-                    feat_found = feat_found + 1
-                    self.matches.append({
-                        'feat_idx': feat_found,
-                        'feature_type': 'feat_slot_through',
-                        'node_indices': candidate_nodes,
-                        'tad_faces': tad_faces
-                    })
-                    matched = True
+                    matched_node_indices.update(candidate_nodes)
                     #print(f"MATCH! Free-form through slot with {n_nodes} faces found.")
 
             # 4. Conjoined Pockets
             if not matched:
                 is_conjoined, num_pockets, base_node= self.is_conjoined_pocket(candidate_graph, candidate_nodes)
                 if is_conjoined:
-                    feat_found = feat_found + 1
-                    self.matches.append({
-                        'feat_idx': feat_found,
-                        'feature_type': 'feat_pocket_blind',
-                        'node_indices': candidate_nodes,
-                        'tad_faces': [base_node],
-                        'num_sub_features': num_pockets
-                    })
-                    matched = True
+                    check_conjoined_pocket.update(candidate_nodes)
                     #print(f"MATCH! Conjoined feature found with {num_pockets} pockets.")
 
             # 5. Unrecognized
             if not matched:
                 print(f"Candidate {candidate_idx} still unrecognized.")
+
+        # 2. Second Pass (Conjoined - Only if nodes were flagged in Pass 1)
+        for candidate_info in feature_candidates_2:
+            candidate_graph = candidate_info['subgraph']
+            candidate_nodes = candidate_info['nodes']
+            n_nodes = len(candidate_nodes)
+            matched = False
+
+            # 1. Skip if already fully matched
+            if all(node in matched_node_indices for node in candidate_nodes):
+                continue
+
+            # 2. Only proceed if these nodes are in our "suspect" set
+            if not any(node in check_conjoined_pocket for node in candidate_nodes):
+                continue
+
+            # Conjoined Pockets Logic
+            G_blind, G_thru = self.build_conjoined_pocket(n_nodes)
+
+            # Note: We use the permissive edge match here because subG2 HAS convex edges
+            permissive_edge_match = lambda d1, d2: True
+
+            gm_blind = isomorphism.GraphMatcher(candidate_graph, G_blind,
+                                                node_match=node_match,
+                                                edge_match=permissive_edge_match)
+
+            gm_thru = isomorphism.GraphMatcher(candidate_graph, G_thru,
+                                               node_match=node_match,
+                                               edge_match=permissive_edge_match)
+
+            # Check Blind
+            if gm_blind.is_isomorphic():
+                # Filter matches already in self.matches to avoid duplicates if necessary
+                tad_faces = [cand_node for cand_node, patt_node in gm_blind.mapping.items()
+                             if G_blind.nodes[patt_node].get('role') == 'base']
+
+                feat_found += 1
+                self.matches.append({
+                    'feat_idx': feat_found,
+                    'feature_type': 'feat_pocket_blind',
+                    'node_indices': candidate_nodes,
+                    'tad_faces': tad_faces
+                })
+                matched = True
+                matched_node_indices.update(candidate_nodes)
+                print(f"MATCH! Conjoined blind pocket found (from flagged nodes).")
+
+            # Check Through
+            elif gm_thru.is_isomorphic():
+                feat_found += 1
+                self.matches.append({
+                    'feat_idx': feat_found,
+                    'feature_type': 'feat_pocket_through',
+                    'node_indices': candidate_nodes,
+                    'tad_faces': []
+                })
+                matched = True
+                matched_node_indices.update(candidate_nodes)
+                print(f"MATCH! Conjoined through pocket found (from flagged nodes).")
+
+
+            if not matched:
+                print(f"Candidate {candidate_idx} still unrecognized.")
+
+
 
         '''print(f"\n=== FINAL RESULTS ===")
         print("\n" + "=" * 60)

@@ -455,10 +455,33 @@ class AAGBuilder_2D:
             self.build_aag_graph()
         def filter_stock_faces(node):
             return self.G.nodes[node].get("stock_face") == "No"
+
         def filter_edge(n1, n2): #n1 and n2 are the 2 nodes
             return self.G[n1][n2].get("edge_type") != "convex" #if convex it returns false and removes
+
+        def filter_edge_not_all(n1, n2): #only removes convex edges connected to stock faces
+            edge_data = self.G[n1][n2]
+            n1_data = self.G.nodes[n1]
+            n2_data = self.G.nodes[n2]
+
+            # If the edge is NOT convex, always keep it (concave/tangent)
+            if edge_data.get("edge_type") != "convex":
+                return True
+
+            # If it IS convex, check if either neighbor is a stock face
+            # If one is a stock face, return False to "cut" the connection
+            is_n1_stock = n1_data.get("stock_face") == "Yes"
+            is_n2_stock = n2_data.get("stock_face") == "Yes"
+
+            if is_n1_stock or is_n2_stock:
+                return False
+
+            # Otherwise, it's a convex edge between two non-stock faces (keep it)
+            return True
+
         # 1. Create the view based on stock filtering and edge type
         view = nx.subgraph_view(self.G, filter_node=filter_stock_faces, filter_edge=filter_edge)
+        view_not_all = nx.subgraph_view(self.G, filter_node=filter_stock_faces, filter_edge=filter_edge_not_all)
 
         # 2. Identify nodes to keep
         nodes_to_keep = []
@@ -485,8 +508,9 @@ class AAGBuilder_2D:
 
         # Create final filtered subgraph
         self.subG = view.subgraph(nodes_to_keep).copy()
+        self.subG2 = view_not_all.subgraph(nodes_to_keep).copy()
 
-        return self.subG
+        return self.subG, self.subG2
 
     # 2. ANALYSE SUBGRAPH FOR FR (connected faces)
 
@@ -513,6 +537,30 @@ class AAGBuilder_2D:
                 'face_types': face_types
             })
         return self.subgraphs_info
+
+    def analyse_subgraphs_not_all(self):
+        if self.subG2 is None:
+            self.build_aag_subgraph()
+        subgraphs = list(nx.connected_components(self.subG2))
+        self.subgraphs_info_2 = []
+
+        for i, nodeset in enumerate(subgraphs):
+            sg = self.subG2.subgraph(nodeset).copy()
+            nodes = list(sg.nodes())
+            n_faces = len(nodes)
+            face_types = [self.face_data_list[node]['type'] for node in nodes]
+            n_concave = sum(1 for _, _, data in sg.edges(data=True) if data.get('edge_type') == 'concave')
+            #print(f"Subgraph {i}: faces={n_faces}, concave_edges={n_concave}")
+
+            self.subgraphs_info_2.append({
+                'subgraph_idx': i,
+                'subgraph': sg,  # the actual graph object
+                'nodes': nodes,
+                'n_faces': n_faces,
+                'n_concave': n_concave,
+                'face_types': face_types
+            })
+        return self.subgraphs_info_2
 
 
     # 3. VISUALIZE GRAPHS
