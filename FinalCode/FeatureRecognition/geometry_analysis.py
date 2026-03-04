@@ -73,7 +73,6 @@ def get_face_geometry(face):
     else:
         return "Other", None
 
-
 def define_stock_face(face_data, xmin, ymin, zmin, xmax, ymax, zmax, tol=0.1):
     # Rule 1: Only Planes can be stock faces
     if face_data["type"] != "Plane":
@@ -105,7 +104,6 @@ def define_stock_face(face_data, xmin, ymin, zmin, xmax, ymax, zmax, tol=0.1):
             return "Yes" if abs(cz - zmin) < tol else "No"
         case _:
             return "No"
-
 
 def normal_vector_face (face, shape):
     _, _, _, _, _, _, stock_box_center = get_stock_box(shape, 1e-6)
@@ -165,8 +163,6 @@ def get_cylinder_axis(face):
         return axis_dir, axis_coords
     return None, None
 
-
-
 def get_face_center (face):
     props = GProp_GProps()
     brepgprop.SurfaceProperties(face, props)
@@ -187,7 +183,6 @@ def get_adjacent_faces(shape, target_face):
                 adjacent_faces.add(face)
 
     return list(adjacent_faces)
-
 
 def triangulate_face(face, linear_deflection=0.1):
     #Triangulate a face and return vertices and triangles
@@ -216,7 +211,6 @@ def triangulate_face(face, linear_deflection=0.1):
 
     return vertices, triangles
 
-
 def triangulate_shape(shape, linear_deflection=0.1):
     #Triangulate the entire shape before extracting face meshes
     #Call this once at the beginning
@@ -225,7 +219,6 @@ def triangulate_shape(shape, linear_deflection=0.1):
     mesher.Perform()
     if not mesher.IsDone():
         print("Warning: Meshing may be incomplete")
-
 
 def classify_edge_type(face1, face2, shared_edge, analyser):
     # Prepare occ lists for each type
@@ -279,7 +272,6 @@ def get_edge_info(edge):
         edge_length += np.linalg.norm(points[j + 1] - points[j])
 
     return edge_geom, edge_length, points
-
 
 
 
@@ -422,7 +414,6 @@ def analyze_shape(my_shape):
         )
 
     return all_faces, face_data_list, analyser, all_edges, edge_data_list
-
 
 def print_face_analysis_table(all_faces, face_data_list):
     def get_axis_label(coords, tol=1e-3):
