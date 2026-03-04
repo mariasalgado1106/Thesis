@@ -11,14 +11,14 @@ from FeatureRecognition.geometry_analysis import (
 )
 
 from SetupPlanning.TAD_and_Dependencies import TAD_Extraction, Dependencies
-
+from SetupPlanning.Process_Plan import Process_Plan
 
 def main():
     # Initialize display
     display, start_display, add_menu, add_function_to_menu = init_display()
 
     # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "Part4.stp"))
+    my_shape = load_step_file(os.path.join("STEPFiles", "Part2.stp"))
     if not my_shape:
         return
 
@@ -40,6 +40,10 @@ def main():
 
     dependencies = Dependencies (my_shape)
     dependencies.print_dependency_table()
+
+    #process plan
+    process_planner = Process_Plan(my_shape)
+    process_planner.print_grouped_tads_and_dependencies()
 
 
     # Visualize results
