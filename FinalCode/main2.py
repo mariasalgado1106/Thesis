@@ -10,7 +10,8 @@ from FeatureRecognition.geometry_analysis import (
     analyze_shape,
 )
 
-from SetupPlanning.TADs import TAD_Extraction
+from SetupPlanning.TAD_and_Dependencies import TAD_Extraction, Dependencies
+
 
 def main():
     # Initialize display
@@ -32,10 +33,13 @@ def main():
         print(f["feature_type"], f["node_indices"])
 
 
-    #TAD
+    #TAD & dependencies
     extractor = TAD_Extraction(my_shape)
     extractor.print_tad_table()
-    extractor.print_grouped_tads()
+    #extractor.print_grouped_tads()
+
+    dependencies = Dependencies (my_shape)
+    dependencies.print_dependency_table()
 
 
     # Visualize results

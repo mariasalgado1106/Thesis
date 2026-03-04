@@ -193,7 +193,7 @@ class FeatureRecognition:
     # Free Form Pocket: 1 base node connected to n-1 nodes, that are all connected in a loop
     # all nodes are planes
     def build_free_form_pocket(self, n):
-        if n < 4:
+        if n < 3:
             # Return empty graphs so nx.is_isomorphic will naturally fail
             return nx.Graph(), nx.Graph(), nx.Graph()
 
