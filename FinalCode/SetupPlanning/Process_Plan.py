@@ -32,8 +32,11 @@ class Process_Plan:
                     groups[axis].append(feat)
         return groups
 
-    def group_by_feat_type(self):
+    def group_by_feat_type(self, features):
+        holes = ['feat_hole_blind', 'feat_hole_through']
         types = {}
+        for feat in features:
+            if
         #separate holes from others
         return types
 
@@ -113,40 +116,6 @@ class Process_Plan:
             pending.remove(chosen)
 
         return sorted_list
-
-    def print_setup_sequencing_debug(self):
-        """
-        Prints a detailed report of how features are ordered within each setup
-        based on area, type, and dependency constraints.
-        """
-        groups = self.group_by_tads()
-
-        print("\n" + "!" * 90)
-        print("DEBUG: INTRA-SETUP SEQUENCING REPORT")
-        print("!" * 90)
-
-        for axis in sorted(groups.keys()):
-            if axis == "INACCESSIBLE": continue
-
-            # Run your ordering logic
-            ordered_feats = self.setup_order(groups[axis], axis)
-
-            print(f"\n>>> SETUP AXIS: {axis} ({len(ordered_feats)} features)")
-            print(f"{'Order':<6} | {'ID':<4} | {'Type':<20} | {'Base Area':<12} | {'Dependencies'}")
-            print("-" * 90)
-
-            for i, f in enumerate(ordered_feats, 1):
-                f_idx = f['feat_idx']
-                f_type = f['feature_type']
-                area = round(f.get('priority_area', 0), 2)
-                deps = ", ".join(map(str, f['dependency'])) if f['dependency'] else "None"
-
-                # Tagging the type group for visual clarity
-                type_tag = "[HOLE]" if f_type in ['feat_hole_blind', 'feat_hole_through'] else "[MILL]"
-
-                print(f"{i:<6} | {f_idx:<4} | {type_tag} {f_type:<14} | {area:<12} | {deps}")
-
-        print("\n" + "!" * 90 + "\n")
 
     def validate_workholding (self, features_of_setup):
         # here i want to see if this setup with these features is possible

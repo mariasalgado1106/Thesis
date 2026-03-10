@@ -172,6 +172,7 @@ def get_face_center (face):
 
 def get_face_area (face):
     props = GProp_GProps()
+    brepgprop.SurfaceProperties(face, props)
     area = props.Mass()
     return area
 
@@ -439,7 +440,7 @@ def print_face_analysis_table(all_faces, face_data_list):
     print(f"Total faces found: {len(all_faces)}")
     print("-------------------------------------------------------------------")
     # I renamed the column header to "Dir/Axis" to reflect that it shows Normal OR Cylinder Axis
-    print(f"{'Face #':<6} | {'Type':<10} | {'Stock':<6} | {'Dir/Axis':<8} | {'Concave':<15} | {'Adjacent'}")
+    print(f"{'Face #':<6} | {'Type':<10} | {'Stock':<6} | {'Dir/Axis':<8} | {'Area':<6} | {'Concave':<15} | {'Adjacent'}")
     print("-" * 105)
 
     for face_data in face_data_list:
@@ -453,6 +454,7 @@ def print_face_analysis_table(all_faces, face_data_list):
               f"{face_data['type']:<10} | "
               f"{face_data['stock_face']:<6} | "
               f"{display_axis:<8} | "
+              f"{face_data['face_area']:<6} | "
               f"{str(face_data['concave_adjacent']):<15} | "
               f"{str(face_data['adjacent_indices'])}")
 

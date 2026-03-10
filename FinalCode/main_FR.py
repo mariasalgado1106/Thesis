@@ -20,7 +20,7 @@ def main():
     print("\n PART 1: GEOMETRY ANALYSIS")
     all_faces, face_data_list, analyser, all_edges, edge_data_list = analyze_shape(my_shape)
     print_face_analysis_table(all_faces, face_data_list)
-    print_edge_analysis_table(all_edges, edge_data_list)
+    #print_edge_analysis_table(all_edges, edge_data_list)
 
     # PART 2: Build AAG
     print("\n PART 2: AAG CONSTRUCTION")
