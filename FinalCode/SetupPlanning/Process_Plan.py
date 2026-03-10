@@ -33,12 +33,131 @@ class Process_Plan:
         return groups
 
     def group_by_feat_type(self, features):
-        holes = ['feat_hole_blind', 'feat_hole_through']
-        types = {}
+        hole_types = ['feat_hole_blind', 'feat_hole_through']
+        grouped_types = {'holes': [],
+                 'others': []}
         for feat in features:
-            if
-        #separate holes from others
-        return types
+            if feat['feature_type'] in hole_types:
+                grouped_types['holes'].append(feat)
+            else:
+                grouped_types['others'].append(feat)
+        return grouped_types
+
+    def generate_optimized_plan(self):
+        # 1. Get features grouped by their possible axes
+        groups = self.group_by_tads()
+
+        # 2. Identify the order of setups (e.g., the one with most features first)
+        # We sort by the length of the feature list in each group
+        sorted_setups = sorted(
+            [axis for axis in groups if axis != "INACCESSIBLE"],
+            key=lambda x: len(groups[x]),
+            reverse=True
+        )
+
+        optimized_plan = []
+        already_planned = set()
+
+        print("\n" + "=" * 50)
+        print("GENERATING OPTIMIZED PROCESS PLAN")
+        print("=" * 50)
+
+        for axis in sorted_setups:
+            # Only take features that haven't been assigned to a previous setup
+            features_to_order = [f for f in groups[axis] if f['feat_idx'] not in already_planned]
+
+            if not features_to_order:
+                continue
+
+            print(f"\n>>> Planning Setup: {axis} ({len(features_to_order)} features)")
+
+            # 3. Call your setup_order to sequence the features within this TAD
+            ordered_sequence = self.setup_order(features_to_order, axis)
+
+            # Store the result
+            optimized_plan.append({
+                'setup': axis,
+                'sequence': [f['feat_idx'] for f in ordered_sequence]
+            })
+
+            # Mark these as done so they aren't produced twice in another setup
+            for f in ordered_sequence:
+                already_planned.add(f['feat_idx'])
+
+        print("\n" + "=" * 50)
+        print("FINAL OPTIMIZED SEQUENCE:")
+        for step in optimized_plan:
+            print(f"Setup {step['setup']}: {step['sequence']}")
+        print("=" * 50 + "\n")
+
+        return optimized_plan
+
+
+    def setup_order (self, features_of_setup, current_setup_axis):
+        # order the features within a setup, based on:
+        # 1. feature type (holes and others -> minimize tool swaps)
+        # 2. base face area (max 1st for stability)
+        # 3. dependencies
+
+        # prioritize starting with "others" and holes for last
+        for f in features_of_setup:
+            relevant_tad = next((t for t in f['tads'] if t['axis'] == current_setup_axis), None)
+            if relevant_tad and relevant_tad['tad_face_index'] != "none":
+                # Blind Features -> tad face area
+                f['priority_area'] = self.face_data_list[relevant_tad['tad_face_index']]['face_area']
+                new = self.recognizer.get_projected_area(f['feat_idx'], current_setup_axis)
+                print(f"area inicial = {f['priority_area']} vs nova {new}")
+            elif relevant_tad != "none":
+                # Through -> max area from all faces
+                f['priority_area'] = self.recognizer.get_projected_area(f['feat_idx'], current_setup_axis)
+
+        ordered_list = []
+        pending = list(features_of_setup) #feat not done still
+        previous_was_hole = 0
+
+        while pending:
+            available = [] #available to be considered and produced now
+            # available = no dependencies in pending (none at all, or they were already produced)
+            for f in pending:
+                current_tad = next((t for t in f['tads'] if t['axis'] == current_setup_axis), None)
+                axis_deps = current_tad['dependency'] if current_tad else []
+                if all(d in [o['feat_idx'] for o in ordered_list] for d in axis_deps):
+                    available.append(f)
+                    # if dependencies were already ordered, it is available; or if there are none
+
+            if not available:
+                # If nothing is available but pending is not empty, we get stuck in a loop
+                if pending:
+                    ordered_list.extend(pending)
+                break
+
+            # 1. prioritized type = others
+            grouped = self.group_by_feat_type(available) #groups only the available ones
+            if grouped['others'] and previous_was_hole != 1:
+                # 2. priority = max area
+                chosen = max(grouped['others'], key=lambda x: x['priority_area'])
+                previous_was_hole = 0
+            elif grouped['holes']:
+                # if no other features are ready, take the hole with max area
+                chosen = max(grouped['holes'], key=lambda x: x['priority_area'])
+                previous_was_hole = 1
+            else:
+                chosen = max(grouped['others'], key=lambda x: x['priority_area'])
+                previous_was_hole = 0
+
+            ordered_list.append(chosen)
+            pending.remove(chosen)
+
+        return ordered_list
+
+
+
+
+
+    def validate_workholding (self, features_of_setup):
+        # here i want to see if this setup with these features is possible
+        # apply 321 technique based on the final product after this setup
+        return None
 
     def print_grouped_tads_and_dependencies(self):
         groups = self.group_by_tads()
@@ -57,67 +176,3 @@ class Process_Plan:
                 print(f"{axis:<15} | Feature {f['feat_idx']:<22} | Needs: {deps}")
 
             print("-" * 80)
-
-    def generate_optimized_plan(self):
-        # here i want to generate a
-        return None
-
-    def setup_order (self, features_of_setup, current_setup_axis):
-        # order the features within a setup, based on:
-        # 1. base face area (max 1st for stability)
-        # 2. feature type (holes and others -> minimize tool swaps)
-        # 3. dependencies
-
-        # 1. Get area of base face of this setup
-        for f in features_of_setup:
-            # only the base face area relevant to this setup axis
-            relevant_tad = next((t for t in f['tads'] if t['axis'] == current_setup_axis), None)
-
-            if relevant_tad and relevant_tad['tad_face_index'] != "none":
-                face_idx = relevant_tad['tad_face_index']
-                f['priority_area'] = self.face_data_list[face_idx]['face_area']
-            else:
-                # Through features or features without a defined base for this TAD
-                f['priority_area'] = 0
-
-        sorted_list = []
-        pending = list(features_of_setup) #to see which features were still not ordered after
-
-        while pending:
-            # Identify features whose dependencies are ALREADY in sorted_list (or have no dependencies)
-            available = []
-            for f in pending:
-                # Check if all dependencies of f are already handled(not in the pending list anymore)
-                deps_still_waiting = [d for d in f['dependency'] if any(p['feat_idx'] == d for p in pending)]
-                if not deps_still_waiting:
-                    available.append(f)
-
-            if not available:
-                # Emergency break for circular dependencies to avoid infinite loop
-                if pending:
-                    sorted_list.extend(pending)
-                break
-
-            # 2. Separate by tool groups (Others vs Holes)
-            hole_types = ['feat_hole_blind', 'feat_hole_through']
-            other_feats = [f for f in available if f['feature_type'] not in hole_types]
-            hole_feats = [f for f in available if f['feature_type'] in hole_types]
-
-            # 3. Decision Logic:
-            if other_feats:
-                # do the one with the biggest area first
-                chosen = max(other_feats, key=lambda x: x['priority_area'])
-            else:
-                # If only holes are ready, start processing them
-                # Sorting holes by area here too, in case one is a large counterbore
-                chosen = max(hole_feats, key=lambda x: x['priority_area'])
-
-            sorted_list.append(chosen)
-            pending.remove(chosen)
-
-        return sorted_list
-
-    def validate_workholding (self, features_of_setup):
-        # here i want to see if this setup with these features is possible
-        # apply 321 technique based on the final product after this setup
-        return None

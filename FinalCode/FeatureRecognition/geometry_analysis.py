@@ -438,27 +438,31 @@ def print_face_analysis_table(all_faces, face_data_list):
 
     print("\n--- Model Face Analysis Table ---")
     print(f"Total faces found: {len(all_faces)}")
-    print("-------------------------------------------------------------------")
-    # I renamed the column header to "Dir/Axis" to reflect that it shows Normal OR Cylinder Axis
-    print(f"{'Face #':<6} | {'Type':<10} | {'Stock':<6} | {'Dir/Axis':<8} | {'Area':<6} | {'Concave':<15} | {'Adjacent'}")
-    print("-" * 105)
+    print("-" * 140) # Increased width for new column
+    # Added 'Center (X, Y, Z)' column
+    print(f"{'Face #':<6} | {'Type':<10} | {'Stock':<6} | {'Dir/Axis':<8} | {'Area':<8} | {'Center (X, Y, Z)':<25} | {'Concave':<15} | {'Adjacent'}")
+    print("-" * 140)
 
     for face_data in face_data_list:
-        # LOGIC: If it's a cylinder, use the Cylinder Axis label. Otherwise, use the Normal Axis label.
         if face_data['type'] == "Cylinder":
             display_axis = get_axis_label(face_data['cylinder_axis_coords'])
         else:
             display_axis = face_data['normal_vector_axis']
 
+        # Formatting the center coordinates to 2 decimal places
+        cx, cy, cz = face_data['face_center']
+        center_str = f"({cx:>7.2f}, {cy:>7.2f}, {cz:>7.2f})"
+
         print(f"{face_data['index']:<6} | "
               f"{face_data['type']:<10} | "
               f"{face_data['stock_face']:<6} | "
               f"{display_axis:<8} | "
-              f"{face_data['face_area']:<6} | "
+              f"{face_data['face_area']:<8.2f} | " # Added .2f for cleaner area values
+              f"{center_str:<25} | "
               f"{str(face_data['concave_adjacent']):<15} | "
               f"{str(face_data['adjacent_indices'])}")
 
-    print("-------------------------------------------------------------------\n")
+    print("-" * 140 + "\n")
 
 def print_edge_analysis_table(all_edges, edge_data_list):
     print("\n--- Model Edge Analysis Table ---")

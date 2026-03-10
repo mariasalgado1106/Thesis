@@ -726,3 +726,40 @@ class FeatureRecognition:
         fig.show()
 
 
+    #FOR AREA THING OF THROUGH POCKETS AND HOLES
+    def get_feature_bbox(self, face_indices):
+        """Calculates the overall bounding box for a set of faces."""
+        all_x, all_y, all_z = [], [], []
+        for idx in face_indices:
+            # Assuming face_data_list[idx] contains 'bbox' as [xmin, ymin, zmin, xmax, ymax, zmax]
+            bbox = self.face_data_list[idx].get('bbox')
+            if bbox:
+                all_x.extend([bbox[0], bbox[3]])
+                all_y.extend([bbox[1], bbox[4]])
+                all_z.extend([bbox[2], bbox[5]])
+
+        if not all_x: return (0, 0, 0, 0, 0, 0)
+        return (min(all_x), min(all_y), min(all_z), max(all_x), max(all_y), max(all_z))
+
+    def get_projected_area(self, feat_idx, axis_label):
+        """Calculates the footprint area of a feature projected onto the plane of the TAD."""
+        # Find the match dictionary
+        match = next((m for m in self.matches if m['feat_idx'] == feat_idx), None)
+        if not match: return 0
+
+        xmin, ymin, zmin, xmax, ymax, zmax = self.get_feature_bbox(match['node_indices'])
+
+        dx = xmax - xmin
+        dy = ymax - ymin
+        dz = zmax - zmin
+
+        # Projection depends on which way the tool is pointing
+        if 'z' in axis_label:
+            return dx * dy
+        elif 'x' in axis_label:
+            return dy * dz
+        elif 'y' in axis_label:
+            return dx * dz
+
+        return 0
+
