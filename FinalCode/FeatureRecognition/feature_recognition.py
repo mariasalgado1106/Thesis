@@ -520,7 +520,7 @@ class FeatureRecognition:
         return self.matches
 
     def visualize_features_3d(self, show_mesh=True, mesh_opacity=0.7,
-                              show_face_centers=True, show_edges=True):
+                              show_face_centers=True, show_edges=True, show_feat_idx=True):
         import plotly.graph_objects as go
         import numpy as np
 
@@ -653,6 +653,34 @@ class FeatureRecognition:
                     text=[str(i) for i in indices],
                     name=f'{ftype} Nodes',
                     showlegend=False
+                ))
+
+        # 2.5 FEATURE Labels (The new conditional block)
+        if show_feat_idx:
+            feat_xs, feat_ys, feat_zs, feat_labels = [], [], [], []
+
+            # We only want to label faces that are part of a recognized feature
+            for match in self.matches:
+                f_id = match['feat_idx']
+                # Heuristic: Label all faces or just the bases for clarity?
+                # Let's do all node_indices for now:
+                for face_idx in match['node_indices']:
+                    center = self.face_data_list[face_idx]['face_center']
+                    feat_xs.append(center[0])
+                    feat_ys.append(center[1])
+                    feat_zs.append(center[2])
+                    # Using <b> for bold and <br> to offset from the face index if needed
+                    feat_labels.append(f"<b>ID:{f_id}</b>")
+
+            if feat_labels:
+                fig.add_trace(go.Scatter3d(
+                    x=feat_xs, y=feat_ys, z=feat_zs,
+                    mode='text',
+                    text=feat_labels,
+                    textposition="bottom center",  # Offset from the face index at "top"
+                    textfont=dict(size=12, color="black"),
+                    name='Feature IDs',
+                    showlegend=True
                 ))
 
         # 3. EDGES

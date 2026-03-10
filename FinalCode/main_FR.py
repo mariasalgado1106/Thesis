@@ -68,7 +68,8 @@ def main():
         recognizer.visualize_features_3d(
             show_mesh=True,
             show_face_centers=False,
-            show_edges=False
+            show_edges=False,
+            show_feat_idx=False
         )
 
     if choice in ["3"]: #show faces & edges

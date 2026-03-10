@@ -18,7 +18,7 @@ def main():
     display, start_display, add_menu, add_function_to_menu = init_display()
 
     # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "Part4.stp"))
+    my_shape = load_step_file(os.path.join("STEPFiles", "Part3.stp"))
     if not my_shape:
         return
 
@@ -62,7 +62,8 @@ def main():
         recognizer.visualize_features_3d(
             show_mesh=True,
             show_face_centers=True,
-            show_edges=True
+            show_edges=True,
+            show_feat_idx=True
         )
 
 
