@@ -18,7 +18,7 @@ def main():
     display, start_display, add_menu, add_function_to_menu = init_display()
 
     # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "Part2.stp"))
+    my_shape = load_step_file(os.path.join("STEPFiles", "Part3.stp"))
     if not my_shape:
         return
 
@@ -44,6 +44,7 @@ def main():
     #process plan
     process_planner = Process_Plan(my_shape)
     process_planner.print_grouped_tads_and_dependencies()
+    #process_planner.print_setup_sequencing_debug()
 
 
     # Visualize results

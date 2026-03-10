@@ -170,6 +170,11 @@ def get_face_center (face):
     face_center_coords = ([center.X(), center.Y(), center.Z()])
     return face_center_coords, center
 
+def get_face_area (face):
+    props = GProp_GProps()
+    area = props.Mass()
+    return area
+
 def get_adjacent_faces(shape, target_face):
     adjacent_faces = set()
     t = TopologyExplorer(shape)
@@ -295,6 +300,7 @@ def analyze_shape(my_shape):
     for i, face in enumerate(all_faces):
         face_type, geometry = get_face_geometry(face)
         face_center, _ = get_face_center(face)
+        face_area = get_face_area(face)
 
         n, n_coords, n_axis = normal_vector_face(face, my_shape)
         axis_obj, axis_coords = get_cylinder_axis(face)
@@ -304,6 +310,7 @@ def analyze_shape(my_shape):
             "face": face,
             "type": face_type,
             "geom": geometry,
+            "face_area": face_area,
             "face_center": face_center,
             "stock_face": "Pending",
             "adjacent_indices": [],
