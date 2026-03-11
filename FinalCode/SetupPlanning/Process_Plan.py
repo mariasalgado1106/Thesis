@@ -92,7 +92,6 @@ class Process_Plan:
 
         return optimized_plan
 
-
     def setup_order (self, features_of_setup, current_setup_axis):
         # order the features within a setup, based on:
         # 1. feature type (holes and others -> minimize tool swaps)
@@ -149,10 +148,6 @@ class Process_Plan:
             pending.remove(chosen)
 
         return ordered_list
-
-
-
-
 
     def validate_workholding (self, features_of_setup):
         # here i want to see if this setup with these features is possible
