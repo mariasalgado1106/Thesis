@@ -520,7 +520,8 @@ class FeatureRecognition:
         return self.matches
 
     def visualize_features_3d(self, show_mesh=True, mesh_opacity=0.7,
-                              show_face_centers=True, show_edges=True, show_feat_idx=True):
+                              show_face_centers=True, show_edges=True, show_feat_idx=True,
+                              show_all_face_centers = False):
         import plotly.graph_objects as go
         import numpy as np
 
@@ -654,6 +655,44 @@ class FeatureRecognition:
                     name=f'{ftype} Nodes',
                     showlegend=False
                 ))
+
+        if show_all_face_centers:
+            face_types = [f['type'] for f in self.face_data_list]
+            centers = [f['face_center'] for f in self.face_data_list]
+
+            face_colors = {
+                'Plane': self.colors_rgb.get('geo_plane', (0, 1, 0)),
+                'Cylinder': self.colors_rgb.get('geo_cylinder', (1, 0, 0)),
+                'Other': self.colors_rgb.get('geo_other', (0, 0, 1))
+            }
+
+            for ftype in sorted(set(face_types)):
+                # only non-stock faces
+                indices = [
+                    f['index']
+                    for f in self.face_data_list
+                    if f['type'] == ftype
+                ]
+
+                if not indices:
+                    continue
+
+                xs = [centers[i][0] for i in indices]
+                ys = [centers[i][1] for i in indices]
+                zs = [centers[i][2] for i in indices]
+
+                r, g, b = face_colors.get(ftype, (0.5, 0.5, 0.5))
+                color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
+                fig.add_trace(go.Scatter3d(
+                    x=xs, y=ys, z=zs,
+                    mode='markers+text',
+                    marker=dict(size=5, color=color_str, line=dict(width=1, color='black')),
+                    text=[str(i) for i in indices],
+                    name=f'{ftype} Nodes',
+                    showlegend=False
+                ))
+
 
         # 2.5 FEATURE Labels (The new conditional block)
         if show_feat_idx:

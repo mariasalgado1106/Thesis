@@ -62,7 +62,6 @@ def get_stock_box(shape, tol=1e-6):
     stock_box_center = gp_Pnt(cx, cy, cz)
     return xmin, ymin, zmin, xmax, ymax, zmax, stock_box_center
 
-
 def get_face_geometry(face):
     adaptor = BRepAdaptor_Surface(face, True) #adapts a face so it can be treated as a surface
     face_type = adaptor.GetType()

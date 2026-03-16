@@ -1,74 +1,69 @@
 from OCC.Display.SimpleGui import init_display
 import os
 
-from FeatureRecognition.feature_recognition import FeatureRecognition, FeatureLibrary
-from FeatureRecognition.part_visualizer_occ import PartVisualizer_occ
-from FeatureRecognition.part_vizualizer_plotly import Part_Visualizer
-from FeatureRecognition.aag_builder import AAGBuilder_2D, AAGBuilder_3D
-from FeatureRecognition.geometry_analysis import (
-    load_step_file,
-    analyze_shape,
-)
-
+from FeatureRecognition.feature_recognition import FeatureRecognition
+from FeatureRecognition.geometry_analysis import load_step_file
 from SetupPlanning.TAD_and_Dependencies import TAD_Extraction, Dependencies
-from SetupPlanning.Process_Plan import Process_Plan
+from SetupPlanning.Setup_Plan import Setup_Plan
+
 
 def main():
-    # Initialize display
-    display, start_display, add_menu, add_function_to_menu = init_display()
-
-    # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "Part4.stp"))
+    # 1. Load STEP file
+    step_file = os.path.join("STEPFiles", "Part3.stp")
+    my_shape = load_step_file(step_file)
     if not my_shape:
+        print("Failed to load shape.")
         return
 
-
-    # Feature Recognition
-    print("\nFEATURE RECOGNITION")
+    # 2. Feature Recognition & TAD Extraction
+    print("\n" + "=" * 30 + "\nFEATURE RECOGNITION\n" + "=" * 30)
     recognizer = FeatureRecognition(my_shape)
     features = recognizer.identify_features()
-    # stats
-    print(f"Detected {len(features)} features")
-    for f in features:
-        print(f["feature_type"], f["node_indices"])
 
-
-    #TAD & dependencies
     extractor = TAD_Extraction(my_shape)
     extractor.print_tad_table()
-    #extractor.print_grouped_tads()
 
-    dependencies = Dependencies (my_shape)
-    dependencies.print_dependency_table()
+    # 3. Process Planning & Workholding Validation
+    print("\n" + "=" * 30 + "\nWORKHOLDING VALIDATION\n" + "=" * 30)
+    process_planner = Setup_Plan(my_shape)
+    groups = process_planner.group_by_tads()
 
-    #process plan
-    process_planner = Process_Plan(my_shape)
-    plan = process_planner.generate_optimized_plan()
-    #process_planner.print_grouped_tads_and_dependencies()
-    #process_planner.print_setup_sequencing_debug()
+    # Let's test the first valid machining axis found in the model
+    test_axes = [axis for axis in groups.keys() if axis != "INACCESSIBLE"]
+
+    if test_axes:
+        for axis in test_axes:
+            print(f"\n>>> Testing Workholding for Setup Axis: {axis}")
+            features_in_setup = groups[axis]
+
+            # CALL YOUR NEW VALIDATION FUNCTION
+            # This triggers: Area Ratio, Triangle Selection, and Stability Score
+            plf_trio, slf, tlf = process_planner.validate_workholding(axis)
+
+            if plf_trio:
+                indices = [f['PLF_idx'] for f in plf_trio]
+                print(f"RESULT: Setup {axis} is VALID. PLF Faces: {indices}")
+            else:
+                print(f"RESULT: Setup {axis} is INVALID or unstable.")
+    else:
+        print("No accessible machining directions found.")
 
 
-    # Visualize results
-    print("\n VISUALIZATION")
-    choice = input(
-            "Visualize: "
-            "(0) Features,"
-            "(1) TADs 3D Volumetric, "
-            "[0/1]: "
-        )
 
 
-    if choice in ["0"]:  # features
+    # 4. Visualization
+    print("\n" + "=" * 30 + "\nVISUALIZATION\n" + "=" * 30)
+    choice = input("Visualize Features? [y/n]: ").lower()
+
+    if choice == 'y':
         recognizer.visualize_features_3d(
             show_mesh=True,
-            show_face_centers=True,
+            show_face_centers=False,
             show_edges=True,
-            show_feat_idx=True
+            show_feat_idx=True,
+            show_all_face_centers = True
         )
 
-
-
-    start_display()
 
 if __name__ == "__main__":
     main()
