@@ -27,7 +27,7 @@ def main():
     print("\n" + "=" * 30 + "\nWORKHOLDING VALIDATION\n" + "=" * 30)
     process_planner = Setup_Plan(my_shape)
 
-    # --- TEST GRID GENERATION ---
+    '''# --- TEST GRID GENERATION ---
     test_axis = '-z'
     # Manually extract PLFs for the test axis to feed the grid generator
     stock_faces = process_planner.define_stock_faces_list()
@@ -57,10 +57,7 @@ def main():
             # 3. Visualize everything
             process_planner.visualize_setup_results(grid_points, locators, cog)
         else:
-            print("Not enough grid points to find locators.")
-
-
-
+            print("Not enough grid points to find locators.")'''
 
 
     # 4. Visualization

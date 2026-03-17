@@ -196,60 +196,77 @@ class Setup_Plan:
         x3, y3 = p3[dims[0]], p3[dims[1]]
         return abs((x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2.0)
 
-    def find_PLF_locators(self, grid_points, axis):
+    def find_PLF_locators(self, grid_points, axis, step_size=1.0):
         cog = self.get_part_cog()
         axis_map = {'z': (0, 1), '-z': (0, 1), 'x': (1, 2), '-x': (1, 2), 'y': (0, 2), '-y': (0, 2)}
         idx1, idx2 = axis_map[axis.lower()]
 
-        # 1. dynamic offset
-        # distance from border to position locators
         pts_array = np.array(grid_points)
         dim1_min, dim1_max = np.min(pts_array[:, idx1]), np.max(pts_array[:, idx1])
         dim2_min, dim2_max = np.min(pts_array[:, idx2]), np.max(pts_array[:, idx2])
-        offset_val = max((dim1_max - dim1_min) * 0.2, (dim2_max - dim2_min) * 0.2)
 
-        # 2. Advanced Filtering of grid: Internal & External Edge Avoidance
-        # We want points that are at least 'offset_val' away from ANY boundary
-        grid_set = set((round(p[idx1], 2), round(p[idx2], 2)) for p in grid_points)
+        # 1. offset to border of grid (internal as well)
+        offset_out = 8
+        offset_in = 4
+
+        grid_set = set((round(p[idx1], 3), round(p[idx2], 3)) for p in grid_points)
         safe_points = []
         for p in grid_points:
-            # Outer edges
-            if not (dim1_min + offset_val < p[idx1] < dim1_max - offset_val and
-                    dim2_min + offset_val < p[idx2] < dim2_max - offset_val):
+            if not (dim1_min + offset_out - 1e-3 <= p[idx1] <= dim1_max - offset_out + 1e-3 and
+                    dim2_min + offset_out - 1e-3 <= p[idx2] <= dim2_max - offset_out + 1e-3):
                 continue
-
-            # Check internal "Empty" spaces (4 direction check)
             test_points = [
-                (round(p[idx1] + offset_val, 2), round(p[idx2], 2)),  # Right
-                (round(p[idx1] - offset_val, 2), round(p[idx2], 2)),  # Left
-                (round(p[idx1], 2), round(p[idx2] + offset_val, 2)),  # Top
-                (round(p[idx1], 2), round(p[idx2] - offset_val, 2))  # Bottom
+                (round(p[idx1] + offset_in, 3), round(p[idx2], 3)),
+                (round(p[idx1] - offset_in, 3), round(p[idx2], 3)),
+                (round(p[idx1], 3), round(p[idx2] + offset_in, 3)),
+                (round(p[idx1], 3), round(p[idx2] - offset_in, 3))
             ]
-
-            # If ALL 4 test points exist in the grid, the current point is "Safe"
             if all(tp in grid_set for tp in test_points):
                 safe_points.append(p)
 
+        print (f"Safe points: {len(safe_points)}")
+        #self.visualize_setup_results(safe_points)
         if len(safe_points) < 3:
-            print("Safety offset too large, falling back to full grid.")
+            print("Fallback: Offset too large.")
             safe_points = grid_points
 
-        ### 3. FIND BIGGEST TRIANGLE OF 3 POINTS
-        # p1: point furthest from CoG
-        p1 = max(safe_points, key=lambda p: np.sqrt((p[idx1] - cog[idx1]) ** 2 + (p[idx2] - cog[idx2]) ** 2))
-        # p2: furthest from p1
-        p2 = max(safe_points, key=lambda p: np.sqrt((p[idx1] - p1[idx1]) ** 2 + (p[idx2] - p1[idx2]) ** 2))
-        # p3: maximizes triangle area with p1 and p2
-        p3 = max(safe_points, key=lambda p: self.calculate_2d_area(p1, p2, p, (idx1, idx2)))
+        # 2. ITERATIVE SEARCH FOR BEST BALANCED TRIANGLE
+        # Sort safe points by distance from CoG to get "corner" candidates
+        corner_candidates = sorted(safe_points,
+            key=lambda p: np.sqrt((p[idx1] - cog[idx1]) ** 2 + (p[idx2] - cog[idx2]) ** 2),
+            reverse=True)
+        best_trio = None
+        max_area = -1
+        is_balanced = False
+        # We check combinations of the best corner candidates (Top 15)
+        # 15 points = 455 combinations. Very fast to check.
+        import itertools
+        for trio in itertools.combinations(corner_candidates[:15], 3):
+            p1, p2, p3 = trio
+            # Check Balance
+            balanced = self._point_in_triangle_2d(cog[idx1], cog[idx2],
+                                                  p1[idx1], p1[idx2],
+                                                  p2[idx1], p2[idx2],
+                                                  p3[idx1], p3[idx2])
+            # Check Area
+            area = self.calculate_2d_area(p1, p2, p3, (idx1, idx2))
 
-        ### 4. Check if CoG is inside
-        u, v = cog[idx1], cog[idx2]
-        x1, y1 = p1[idx1], p1[idx2]
-        x2, y2 = p2[idx1], p2[idx2]
-        x3, y3 = p3[idx1], p3[idx2]
-        is_balanced = self._point_in_triangle_2d(u, v, x1, y1, x2, y2, x3, y3)
+            # We want the biggest area that is balanced
+            if balanced and area > max_area:
+                max_area = area
+                best_trio = (p1, p2, p3)
+                is_balanced = True
 
-        return (p1, p2, p3), is_balanced
+        # 3. Final Fallback
+        # If NO balanced triangle was found in the corners, take the absolute biggest triangle
+        if not best_trio:
+            p1 = corner_candidates[0]
+            p2 = max(safe_points, key=lambda p: np.linalg.norm(p[[idx1, idx2]] - p1[[idx1, idx2]]))
+            p3 = max(safe_points, key=lambda p: self.calculate_2d_area(p1, p2, p, (idx1, idx2)))
+            best_trio = (p1, p2, p3)
+            is_balanced = False  # Still unbalanced, but at least we have a solution
+
+        return best_trio, is_balanced
 
     def validate_workholding (self, axis):
         # apply 321 technique based on the final part (worst case scenario)
