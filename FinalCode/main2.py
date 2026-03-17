@@ -26,27 +26,39 @@ def main():
     # 3. Process Planning & Workholding Validation
     print("\n" + "=" * 30 + "\nWORKHOLDING VALIDATION\n" + "=" * 30)
     process_planner = Setup_Plan(my_shape)
-    groups = process_planner.group_by_tads()
 
-    # Let's test the first valid machining axis found in the model
-    test_axes = [axis for axis in groups.keys() if axis != "INACCESSIBLE"]
+    # --- TEST GRID GENERATION ---
+    test_axis = '-z'
+    # Manually extract PLFs for the test axis to feed the grid generator
+    stock_faces = process_planner.define_stock_faces_list()
+    test_plfs = []
+    for sf in stock_faces:
+        if sf['opposite_TAD'] == test_axis:
+            test_plfs.append({
+                'PLF_idx': sf['stock_face_idx'],
+                'PLF_center': process_planner.face_data_list[sf['stock_face_idx']]['face_center']
+            })
 
-    if test_axes:
-        for axis in test_axes:
-            print(f"\n>>> Testing Workholding for Setup Axis: {axis}")
-            features_in_setup = groups[axis]
+    if test_plfs:
+        print(f"Generating grid for {test_axis}...")
+        grid_points = process_planner.generate_locating_grid(test_plfs, test_axis)
 
-            # CALL YOUR NEW VALIDATION FUNCTION
-            # This triggers: Area Ratio, Triangle Selection, and Stability Score
-            plf_trio, slf, tlf = process_planner.validate_workholding(axis)
+        if len(grid_points) >= 3:
+            # 1. Find the locators
+            locators, balanced = process_planner.find_PLF_locators(grid_points, test_axis)
 
-            if plf_trio:
-                indices = [f['PLF_idx'] for f in plf_trio]
-                print(f"RESULT: Setup {axis} is VALID. PLF Faces: {indices}")
-            else:
-                print(f"RESULT: Setup {axis} is INVALID or unstable.")
-    else:
-        print("No accessible machining directions found.")
+            # 2. Get CoG for visualization
+            cog = process_planner.get_part_cog()
+
+            print(f"Generated {len(grid_points)} valid grid points.")
+            print(f"Locators found: {locators}")
+            print(f"Balanced: {balanced}")
+
+            # 3. Visualize everything
+            process_planner.visualize_setup_results(grid_points, locators, cog)
+        else:
+            print("Not enough grid points to find locators.")
+
 
 
 
