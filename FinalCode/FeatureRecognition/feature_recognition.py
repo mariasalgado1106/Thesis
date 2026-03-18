@@ -498,11 +498,8 @@ class FeatureRecognition:
                 matched_node_indices.update(candidate_nodes)
                 print(f"MATCH! Conjoined through pocket found (from flagged nodes).")
 
-
             if not matched:
                 print(f"Candidate {candidate_idx} still unrecognized.")
-
-
 
         '''print(f"\n=== FINAL RESULTS ===")
         print("\n" + "=" * 60)

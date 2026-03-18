@@ -64,9 +64,12 @@ def main():
 
     # 4. Visualization
     print("\n" + "=" * 30 + "\nVISUALIZATION\n" + "=" * 30)
-    choice = input("Visualize Features? [y/n]: ").lower()
+    choice = input(
+        "Visualize:"
+        "(0) Only Features,"
+        "(1) Features + Locators ").lower()
 
-    if choice == 'y':
+    if choice == '0':
         recognizer.visualize_features_3d(
             show_mesh=True,
             show_face_centers=False,
@@ -74,6 +77,9 @@ def main():
             show_feat_idx=True,
             show_all_face_centers = True
         )
+
+    if choice == '1':
+        process_planner.visualize_everything()
 
 
 if __name__ == "__main__":

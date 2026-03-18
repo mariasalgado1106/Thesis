@@ -19,6 +19,7 @@ class Setup_Plan:
 
         self.recognizer = FeatureRecognition(self.shape)
         self.features = self.recognizer.identify_features()
+        self.colors_rgb = self.recognizer.colors_rgb
 
         self.tad_extractor = TAD_Extraction(self.shape)
         self.dep_extractor = Dependencies(self.shape)
@@ -395,6 +396,317 @@ class Setup_Plan:
         print("=" * 50 + "\n")
 
         return optimized_plan
+
+
+    def visualize_everything(self, show_mesh=True, mesh_opacity=0.7,
+                              show_face_centers=True, show_edges=True, show_feat_idx=True,
+                              show_all_face_centers = True, show_locators = True):
+        import plotly.graph_objects as go
+        import numpy as np
+
+        fig = go.Figure()
+
+        feature_name_map = {
+            'feat_hole_blind': 'Blind Hole',
+            'feat_hole_through': 'Through Hole',
+            'feat_pocket_blind': 'Blind Pocket',
+            'feat_pocket_through': 'Through Pocket',
+            'feat_slot_blind': 'Blind Slot',
+            'feat_slot_through': 'Through Slot',
+            'feat_step_blind': 'Blind Step',
+            'feat_step_through': 'Through Step',
+            'unrecognized': 'Unrecognized Face',
+            'stock': 'Part Body'
+        }
+
+        face_to_feature = {}
+        for match in self.features:
+            feature_type = match['feature_type']
+            for face_idx in match['node_indices']:
+                face_to_feature[face_idx] = feature_type
+
+        feature_colors = self.colors_rgb
+
+        # Colored Features + mesh
+        if show_mesh:
+            feature_groups = {}
+            for face_data in self.face_data_list:
+                face_idx = face_data['index']
+
+                if face_data['stock_face'] == 'Yes':
+                    group_key = 'stock'
+                elif face_idx in face_to_feature:
+                    group_key = face_to_feature[face_idx]
+                else:
+                    group_key = 'unrecognized'
+
+                if group_key not in feature_groups:
+                    feature_groups[group_key] = []
+                feature_groups[group_key].append(face_data)
+
+            for group_key, faces in feature_groups.items():
+                all_vertices = []
+                all_triangles = []
+                vertex_offset = 0
+
+                for face_data in faces:
+                    vertices = face_data.get('mesh_vertices', [])
+                    triangles = face_data.get('mesh_triangles', [])
+
+                    if not vertices or not triangles:
+                        continue
+
+                    all_vertices.extend(vertices)
+                    for tri in triangles:
+                        all_triangles.append([
+                            tri[0] + vertex_offset,
+                            tri[1] + vertex_offset,
+                            tri[2] + vertex_offset
+                        ])
+                    vertex_offset += len(vertices)
+
+                if not all_vertices:
+                    continue
+
+                if group_key == 'stock':
+                    color_str = 'rgb(200, 200, 200)'
+                    current_opacity = 0.1
+                elif group_key == 'unrecognized':
+                    color_str = 'rgb(100, 100, 100)'
+                    current_opacity = 0.5
+                else:
+                    r, g, b = feature_colors.get(group_key, (0.7, 0.7, 0.7))
+                    color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+                    current_opacity = mesh_opacity
+
+                display_name = feature_name_map.get(group_key, group_key)
+
+                fig.add_trace(go.Mesh3d(
+                    x=[v[0] for v in all_vertices],
+                    y=[v[1] for v in all_vertices],
+                    z=[v[2] for v in all_vertices],
+                    i=[t[0] for t in all_triangles],
+                    j=[t[1] for t in all_triangles],
+                    k=[t[2] for t in all_triangles],
+                    color=color_str,
+                    opacity=current_opacity,
+                    name=display_name,
+                    showlegend=True,
+                    flatshading=False,
+                    lighting=dict(ambient=0.5, diffuse=0.8, specular=0.2),
+                    lightposition=dict(x=100, y=200, z=300)
+                ))
+
+        # 2. FACE nodes
+        if show_face_centers:
+            face_types = [f['type'] for f in self.face_data_list]
+            centers = [f['face_center'] for f in self.face_data_list]
+
+            face_colors = {
+                'Plane': self.colors_rgb.get('geo_plane', (0, 1, 0)),
+                'Cylinder': self.colors_rgb.get('geo_cylinder', (1, 0, 0)),
+                'Other': self.colors_rgb.get('geo_other', (0, 0, 1))
+            }
+
+            for ftype in sorted(set(face_types)):
+                # only non-stock faces
+                indices = [
+                    f['index']
+                    for f in self.face_data_list
+                    if f['type'] == ftype and f['stock_face'] != "Yes"
+                ]
+
+                if not indices:
+                    continue
+
+                xs = [centers[i][0] for i in indices]
+                ys = [centers[i][1] for i in indices]
+                zs = [centers[i][2] for i in indices]
+
+                r, g, b = face_colors.get(ftype, (0.5, 0.5, 0.5))
+                color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
+                fig.add_trace(go.Scatter3d(
+                    x=xs, y=ys, z=zs,
+                    mode='markers+text',
+                    marker=dict(size=5, color=color_str, line=dict(width=1, color='black')),
+                    text=[str(i) for i in indices],
+                    name=f'{ftype} Nodes',
+                    showlegend=False
+                ))
+
+        if show_all_face_centers:
+            face_types = [f['type'] for f in self.face_data_list]
+            centers = [f['face_center'] for f in self.face_data_list]
+
+            face_colors = {
+                'Plane': self.colors_rgb.get('geo_plane', (0, 1, 0)),
+                'Cylinder': self.colors_rgb.get('geo_cylinder', (1, 0, 0)),
+                'Other': self.colors_rgb.get('geo_other', (0, 0, 1))
+            }
+
+            for ftype in sorted(set(face_types)):
+                # only non-stock faces
+                indices = [
+                    f['index']
+                    for f in self.face_data_list
+                    if f['type'] == ftype
+                ]
+
+                if not indices:
+                    continue
+
+                xs = [centers[i][0] for i in indices]
+                ys = [centers[i][1] for i in indices]
+                zs = [centers[i][2] for i in indices]
+
+                r, g, b = face_colors.get(ftype, (0.5, 0.5, 0.5))
+                color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
+                fig.add_trace(go.Scatter3d(
+                    x=xs, y=ys, z=zs,
+                    mode='markers+text',
+                    marker=dict(size=5, color=color_str, line=dict(width=1, color='black')),
+                    text=[str(i) for i in indices],
+                    name=f'{ftype} Nodes',
+                    showlegend=False
+                ))
+
+
+        # 2.5 FEATURE Labels (The new conditional block)
+        if show_feat_idx:
+            feat_xs, feat_ys, feat_zs, feat_labels = [], [], [], []
+
+            # We only want to label faces that are part of a recognized feature
+            for match in self.features:
+                f_id = match['feat_idx']
+                # Heuristic: Label all faces or just the bases for clarity?
+                # Let's do all node_indices for now:
+                for face_idx in match['node_indices']:
+                    center = self.face_data_list[face_idx]['face_center']
+                    feat_xs.append(center[0])
+                    feat_ys.append(center[1])
+                    feat_zs.append(center[2])
+                    # Using <b> for bold and <br> to offset from the face index if needed
+                    feat_labels.append(f"<b>ID:{f_id}</b>")
+
+            if feat_labels:
+                fig.add_trace(go.Scatter3d(
+                    x=feat_xs, y=feat_ys, z=feat_zs,
+                    mode='text',
+                    text=feat_labels,
+                    textposition="bottom center",  # Offset from the face index at "top"
+                    textfont=dict(size=12, color="black"),
+                    name='Feature IDs',
+                    showlegend=True
+                ))
+
+        # 3. EDGES
+        if show_edges:
+            edge_groups = {
+                'Convex': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': self.colors_rgb.get('edge_convex', (0, 0, 1)),  # Blue-ish
+                    'width': 4
+                },
+                'Concave': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': self.colors_rgb.get('edge_concave', (1, 0, 0)),  # Red
+                    'width': 4
+                },
+                'Tangent': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': self.colors_rgb.get('edge_tangent', (0, 1, 0)),  # Green
+                    'width': 3
+                },
+                'Unknown': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': (0.5, 0.5, 0.5),
+                    'width': 2
+                }
+            }
+
+            for edge in self.edge_data_list:
+                # Type
+                etype = 'Unknown'
+                if edge.get('classification'):
+                    etype = edge['classification'][0]  # Take the first classification
+
+                # Geometry Points
+                points = edge.get('points', [])
+                if len(points) == 0:
+                    continue
+
+                group = edge_groups.get(etype, edge_groups['Unknown'])
+
+                group['x'].extend([p[0] for p in points] + [None])
+                group['y'].extend([p[1] for p in points] + [None])
+                group['z'].extend([p[2] for p in points] + [None])
+
+            for name, group in edge_groups.items():
+                if not group['x']:
+                    continue
+
+                r, g, b = group['color']
+                color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
+                fig.add_trace(go.Scatter3d(
+                    x=group['x'], y=group['y'], z=group['z'],
+                    mode='lines',
+                    line=dict(color=color_str, width=group['width']),
+                    name=f"{name} Edges",
+                    showlegend=True
+                ))
+
+        # 4. PLF LOCATORS (Primary Support Pins)
+        if show_locators:
+            locators_data = []
+            try:
+                groups = self.group_by_tads()
+                first_axis = sorted(groups.keys())[0] if groups else None
+                if first_axis:
+                    plf_data, _, _, validated = self.validate_workholding(first_axis)
+                    if validated and plf_data:
+                        locators_data = plf_data['PLF_locators']
+            except Exception as e:
+                print(f"Could not automatically fetch locators: {e}")
+            if locators_data:
+                # locators_data is expected to be a list of 3 points: [p1, p2, p3]
+                loc_xs = [p[0] for p in locators_data]
+                loc_ys = [p[1] for p in locators_data]
+                loc_zs = [p[2] for p in locators_data]
+
+                fig.add_trace(go.Scatter3d(
+                    x=loc_xs, y=loc_ys, z=loc_zs,
+                    mode='markers+text',
+                    marker=dict(
+                        size=10,
+                        color='blue',
+                        symbol='circle',
+                        opacity=1.0,
+                        line=dict(width=2, color='white')
+                    ),
+                    text=["P1", "P2", "P3"],
+                    textposition="top center",
+                    name='PLF Locators (3)',
+                    showlegend=True
+                ))
+
+        fig.update_layout(
+            title="Feature Recognition Visualization",
+            scene=dict(
+                xaxis_title="X",
+                yaxis_title="Y",
+                zaxis_title="Z",
+                aspectmode="data"
+            ),
+            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+            width=1200, height=900
+        )
+        fig.show()
+
+
+
 
     def setup_order(self, features_of_setup, current_setup_axis):
         # order the features within a setup, based on:
