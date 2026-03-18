@@ -230,38 +230,57 @@ class Setup_Plan:
             print("Fallback: Offset too large.")
             safe_points = grid_points
 
-        # 2. ITERATIVE SEARCH FOR BEST BALANCED TRIANGLE
-        # Sort safe points by distance from CoG to get "corner" candidates
-        corner_candidates = sorted(safe_points,
-            key=lambda p: np.sqrt((p[idx1] - cog[idx1]) ** 2 + (p[idx2] - cog[idx2]) ** 2),
-            reverse=True)
+        # 2. QUADRANT SAMPLING FOR BETTER BALANCE
+        # Separate points into 4 lists based on their position relative to CoG
+        q_lists = [
+            [p for p in safe_points if p[idx1] >= cog[idx1] and p[idx2] >= cog[idx2]],  # Q1
+            [p for p in safe_points if p[idx1] < cog[idx1] and p[idx2] >= cog[idx2]],  # Q2
+            [p for p in safe_points if p[idx1] < cog[idx1] and p[idx2] < cog[idx2]],  # Q3
+            [p for p in safe_points if p[idx1] >= cog[idx1] and p[idx2] < cog[idx2]]  # Q4
+        ]
+        sorted_quadrants = []
+        for q in q_lists:
+            sorted_q = sorted(q, key=lambda p: np.sqrt((p[idx1] - cog[idx1]) ** 2 + (p[idx2] - cog[idx2]) ** 2),
+                              reverse=True)
+            sorted_quadrants.append(sorted_q)
+        k = 3  # Start with top 3 furthest points per quadrant
+        max_k = 40  # Safety limit
         best_trio = None
         max_area = -1
         is_balanced = False
-        # We check combinations of the best corner candidates (Top 15)
-        # 15 points = 455 combinations. Very fast to check.
-        import itertools
-        for trio in itertools.combinations(corner_candidates[:15], 3):
-            p1, p2, p3 = trio
-            # Check Balance
-            balanced = self._point_in_triangle_2d(cog[idx1], cog[idx2],
-                                                  p1[idx1], p1[idx2],
-                                                  p2[idx1], p2[idx2],
-                                                  p3[idx1], p3[idx2])
-            # Check Area
-            area = self.calculate_2d_area(p1, p2, p3, (idx1, idx2))
+        while k <= max_k and not is_balanced:
+            sampling_pool = []
+            for sq in sorted_quadrants:
+                sampling_pool.extend(sq[:k])
+            unique_pool = [] #avoid duplicates from previous iteration
+            [unique_pool.append(p) for p in sampling_pool if p not in unique_pool]
 
-            # We want the biggest area that is balanced
-            if balanced and area > max_area:
-                max_area = area
-                best_trio = (p1, p2, p3)
-                is_balanced = True
+            # Check all combinations in the current pool
+            for trio in itertools.combinations(unique_pool, 3):
+                p1, p2, p3 = trio
+                balanced = self._point_in_triangle_2d(cog[idx1], cog[idx2],
+                                                      p1[idx1], p1[idx2],
+                                                      p2[idx1], p2[idx2],
+                                                      p3[idx1], p3[idx2])
 
-        # 3. Final Fallback
-        # If NO balanced triangle was found in the corners, take the absolute biggest triangle
+                if balanced:
+                    area = self.calculate_2d_area(p1, p2, p3, (idx1, idx2))
+                    if area > max_area:
+                        max_area = area
+                        best_trio = (p1, p2, p3)
+                        is_balanced = True
+
+            if is_balanced:
+                print(f"Success: Balanced solution found at k={k}")
+                break
+
+            k += 2  # Increase the depth of the search
+
+        # 3. FINAL FALLBACK (If still no balance, just take the biggest possible)
         if not best_trio:
-            p1 = corner_candidates[0]
-            p2 = max(safe_points, key=lambda p: np.linalg.norm(p[[idx1, idx2]] - p1[[idx1, idx2]]))
+            print("Final Fallback: No balanced solution possible. Choosing max area.")
+            p1 = sorted_quadrants[0][0] if sorted_quadrants[0] else safe_points[0]
+            p2 = max(safe_points, key=lambda p: np.sqrt((p[idx1] - p1[idx1])**2 + (p[idx2] - p1[idx2])**2))
             p3 = max(safe_points, key=lambda p: self.calculate_2d_area(p1, p2, p, (idx1, idx2)))
             best_trio = (p1, p2, p3)
             is_balanced = False  # Still unbalanced, but at least we have a solution
@@ -271,7 +290,7 @@ class Setup_Plan:
     def validate_workholding (self, axis):
         # apply 321 technique based on the final part (worst case scenario)
         PLFs = []
-        PLF_locators = None
+        PLF = []
         SLF = None
         TLF = None
 
@@ -300,7 +319,7 @@ class Setup_Plan:
         original_area = self.get_original_stock_area(axis)
         if original_area > 0:
             area_ratio = (PLF_total_area / original_area) * 100
-            print(f"Total PLF Area: {PLF_total_area:.2f} / Original: {original_area:.2f} ({area_ratio:.1f}%)")
+            #print(f"Total PLF Area: {PLF_total_area:.2f} / Original: {original_area:.2f} ({area_ratio:.1f}%)")
             if area_ratio < 30:
                 print(f"WARNING: Stability compromised! Only {area_ratio:.1f}% of the base remains.")
                 validated = False
@@ -308,33 +327,34 @@ class Setup_Plan:
         # 2.2 Identify 3 specific locator points based on centers
         nr_PLFs = len(PLFs)
         grid_pts = self.generate_locating_grid(PLFs, axis)
-        if len(grid_pts) >= 3:
+        if len(grid_pts) >= 3 and validated:
             locators, balanced = self.find_PLF_locators(grid_pts, axis)
-            PLF_locators = locators  # Assign the found points to PLF for the return statement
-            print(f"Primary Locators: {locators}")
-            print(f"CoG Balanced: {balanced}")
+            if not balanced:
+                validated = False
+                print("!!Couldn't find a balanced solution!!")
+            else:
+                PLF = ({
+                    'PLF_faces': PLFs,
+                    'PLF_locators': locators
+                })
+                print(f"Primary Locators: {locators}")
+                print(f"CoG Balanced: {balanced}")
 
 
-        return PLF_locators, SLF, TLF
-
-
-
+        return PLF, SLF, TLF, validated
 
 
     def generate_optimized_plan(self):
-        # 1. features grouped by tads
+        ### 1. features grouped by tads
         groups = self.group_by_tads()
 
-        # 2. order tads (max features 1st)
+        ### 2. order tads (max features 1st)
         # sort by the length of the feature list in each group
-        sorted_setups = sorted(
-            [axis for axis in groups if axis != "INACCESSIBLE"],
-            key=lambda x: len(groups[x]),
-            reverse=True
-        )
+        sorted_setups = sorted([axis for axis in groups if axis != "INACCESSIBLE"],
+            key=lambda x: len(groups[x]), reverse=True)
 
         optimized_plan = [] # setups in order, respective features, PLF, SLF, TLF
-        already_planned = set() #features that were already done, fol filtering after
+        already_planned = set() #features that were already done, for filtering after
 
         print("\n" + "=" * 50)
         print("GENERATING OPTIMIZED PROCESS PLAN")
@@ -343,14 +363,16 @@ class Setup_Plan:
         for axis in sorted_setups:
             # only features that haven't been assigned to a previous setup
             features_to_order = [f for f in groups[axis] if f['feat_idx'] not in already_planned]
-
             if not features_to_order:
                 continue
-
             print(f"\n>>> Planning Setup: {axis} ({len(features_to_order)} features)")
 
-            # 3. Validate setup (check the workholding and faces used)
-            PLF, SLF, TLF = self.validate_workholding(axis)
+            ### 3. Validate setup (check the workholding and faces used)
+            PLF, SLF, TLF, validated = self.validate_workholding(axis)
+            if validated:
+                print(f"!!Setup Workholding was VALIDATED!!")
+            elif not validated:
+                continue
 
             # 4. sequence the features within this TAD (not relevant but it's done)
             ordered_sequence = self.setup_order(features_to_order, axis)
@@ -358,7 +380,8 @@ class Setup_Plan:
             # Store the result
             optimized_plan.append({
                 'setup': axis,
-                'sequence': [f['feat_idx'] for f in ordered_sequence]
+                'sequence': [f['feat_idx'] for f in ordered_sequence],
+                'PLF': PLF
             })
 
             # Mark these as done so they aren't produced twice in another setup
@@ -386,7 +409,7 @@ class Setup_Plan:
                 # Blind Features -> tad face area
                 f['priority_area'] = self.face_data_list[relevant_tad['tad_face_index']]['face_area']
                 new = self.recognizer.get_projected_area(f['feat_idx'], current_setup_axis)
-                print(f"area inicial = {f['priority_area']} vs nova {new}")
+                #print(f"area inicial = {f['priority_area']} vs nova {new}")
             elif relevant_tad != "none":
                 # Through -> max area from all faces
                 f['priority_area'] = self.recognizer.get_projected_area(f['feat_idx'], current_setup_axis)
