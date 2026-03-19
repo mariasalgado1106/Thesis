@@ -26,9 +26,9 @@ def main():
     # 3. Process Planning & Workholding Validation
     print("\n" + "=" * 30 + "\nWORKHOLDING VALIDATION\n" + "=" * 30)
     process_planner = Setup_Plan(my_shape)
-    optimized_plan = process_planner.generate_optimized_plan()
+    #optimized_plan = process_planner.generate_optimized_plan()
 
-    #'''
+    '''
     # --- TEST GRID GENERATION ---
     test_axis = 'x'
     # Manually extract PLFs for the test axis to feed the grid generator
