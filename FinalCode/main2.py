@@ -9,7 +9,7 @@ from SetupPlanning.Setup_Plan import Setup_Plan
 
 def main():
     # 1. Load STEP file
-    step_file = os.path.join("STEPFiles", "Part2.stp")
+    step_file = os.path.join("STEPFiles", "Part4.stp")
     my_shape = load_step_file(step_file)
     if not my_shape:
         print("Failed to load shape.")
@@ -26,11 +26,11 @@ def main():
     # 3. Process Planning & Workholding Validation
     print("\n" + "=" * 30 + "\nWORKHOLDING VALIDATION\n" + "=" * 30)
     process_planner = Setup_Plan(my_shape)
-    #optimized_plan = process_planner.generate_optimized_plan()
+    optimized_plan = process_planner.generate_optimized_plan()
 
     '''
     # --- TEST GRID GENERATION ---
-    test_axis = 'x'
+    test_axis = '-z'
     # Manually extract PLFs for the test axis to feed the grid generator
     stock_faces = process_planner.define_stock_faces_list()
     test_plfs = []
