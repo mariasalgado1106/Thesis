@@ -416,7 +416,7 @@ class Setup_Plan:
             optimized_plan.append({
                 'setup': axis,
                 'sequence': [f['feat_idx'] for f in ordered_sequence],
-                'extra_sharp_edges': extra_features_ids,
+                'extra_features': extra_features_ids,
                 'is_extra_only': is_extra_setup_only,
                 'PLF': PLF
             })
@@ -434,7 +434,7 @@ class Setup_Plan:
                 setup_label += " (EXTRA)"
 
             primary_seq = str(step['sequence'])
-            extra_seq = str(step['extra_sharp_edges']) if step['extra_sharp_edges'] else "-"
+            extra_seq = str(step['extra_features']) if step['extra_features'] else "-"
 
             print(f"{setup_label:<10} | {primary_seq:<30} | {extra_seq}")
 
