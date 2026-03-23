@@ -26,40 +26,32 @@ def main():
     # 3. Process Planning & Workholding Validation
     print("\n" + "=" * 30 + "\nWORKHOLDING VALIDATION\n" + "=" * 30)
     process_planner = Setup_Plan(my_shape)
-    optimized_plan = process_planner.generate_optimized_plan()
+    #optimized_plan = process_planner.generate_optimized_plan()
 
-    '''
-    # --- TEST GRID GENERATION ---
+    #'''
+    # --- TEST 3-2-1 CONFIGURATION ---
     test_axis = '-z'
-    # Manually extract PLFs for the test axis to feed the grid generator
-    stock_faces = process_planner.define_stock_faces_list()
-    test_plfs = []
-    for sf in stock_faces:
-        if sf['opposite_TAD'] == test_axis:
-            test_plfs.append({
-                'PLF_idx': sf['stock_face_idx'],
-                'PLF_center': process_planner.face_data_list[sf['stock_face_idx']]['face_center']
-            })
 
-    if test_plfs:
-        print(f"Generating grid for {test_axis}...")
-        grid_points = process_planner.generate_locating_grid(test_plfs, test_axis)
+    # 1. Run the full validation to get PLF, SLF, and TLF locators
+    print(f"Calculating full 3-2-1 setup for {test_axis}...")
+    PLF_res, SLF_res, TLF_res, validated = process_planner.validate_workholding(test_axis)
 
-        if len(grid_points) >= 3:
-            # 1. Find the locators
-            locators, balanced = process_planner.find_PLF_locators(grid_points, test_axis)
+    if validated:
+        # Extract coordinates from the results
+        p_locs = PLF_res['PLF_locators']
+        s_locs = SLF_res['SLF_locators']
+        t_locs = TLF_res['TLF_locators']
+        cog_point = process_planner.get_part_cog()
 
-            # 2. Get CoG for visualization
-            cog = process_planner.get_part_cog()
-
-            print(f"Generated {len(grid_points)} valid grid points.")
-            print(f"Locators found: {locators}")
-            print(f"Balanced: {balanced}")
-
-            # 3. Visualize everything
-            process_planner.visualize_setup_results(grid_points, locators, cog)
-        else:
-            print("Not enough grid points to find locators.")#'''
+        # 2. Visualize only the part and the locators
+        process_planner.visualize_setup_3d(
+            PLF_locs=p_locs,
+            SLF_locs=s_locs,
+            TLF_locs=t_locs,
+            cog=cog_point
+        )
+    else:
+        print("Setup could not be validated.")#'''
 
 
     # 4. Visualization

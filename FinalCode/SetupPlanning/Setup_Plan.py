@@ -124,7 +124,7 @@ class Setup_Plan:
 
     #### define the points for locators based on grid ###
 
-    def generate_locating_grid(self, PLFs, axis, step_size=1.0):
+    def generate_locating_grid(self, xLFs, axis, step_size=1.0):
         axis_map = {
             'z': (0, 1, 2), '-z': (0, 1, 2),
             'x': (1, 2, 0), '-x': (1, 2, 0),
@@ -144,8 +144,8 @@ class Setup_Plan:
         for v1 in dim1_range:
             for v2 in dim2_range:
                 is_on_material = False
-                for plf in PLFs:
-                    f_idx = plf['PLF_idx']
+                for xlf in xLFs:
+                    f_idx = xlf['Face_idx']
                     vertices = self.face_data_list[f_idx]['mesh_vertices']
                     triangles = self.face_data_list[f_idx]['mesh_triangles']
                     # Point-in-Triangle check (projected to 2D)
@@ -155,7 +155,7 @@ class Setup_Plan:
 
                 if is_on_material:
                     # Store the actual 3D coordinate of the valid point
-                    h = PLFs[0]['PLF_center'][fixed_idx] #use 3rd coord from center of faces
+                    h = xLFs[0]['Face_center'][fixed_idx] #use 3rd coord from center of faces
                     pnt = [0, 0, 0]
                     pnt[idx1], pnt[idx2], pnt[fixed_idx] = v1, v2, h
                     grid_points.append(pnt)
@@ -199,18 +199,12 @@ class Setup_Plan:
         x3, y3 = p3[dims[0]], p3[dims[1]]
         return abs((x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2.0)
 
-    def find_PLF_locators(self, grid_points, axis, step_size=1.0):
-        cog = self.get_part_cog()
+    def define_safe_pts_grid (self, axis, grid_points, offset_out, offset_in):
         axis_map = {'z': (0, 1), '-z': (0, 1), 'x': (1, 2), '-x': (1, 2), 'y': (0, 2), '-y': (0, 2)}
         idx1, idx2 = axis_map[axis.lower()]
-
         pts_array = np.array(grid_points)
         dim1_min, dim1_max = np.min(pts_array[:, idx1]), np.max(pts_array[:, idx1])
         dim2_min, dim2_max = np.min(pts_array[:, idx2]), np.max(pts_array[:, idx2])
-
-        # 1. offset to border of grid (internal as well)
-        offset_out = 8
-        offset_in = 4
 
         grid_set = set((round(p[idx1], 3), round(p[idx2], 3)) for p in grid_points)
         safe_points = []
@@ -226,14 +220,23 @@ class Setup_Plan:
             ]
             if all(tp in grid_set for tp in test_points):
                 safe_points.append(p)
-
-        print (f"Safe points: {len(safe_points)}")
-        #self.visualize_setup_results(safe_points)
+        print(f"Safe points: {len(safe_points)}")
+        # self.visualize_setup_results(safe_points)
         if len(safe_points) < 3:
             print("Fallback: Offset too large.")
             safe_points = grid_points
 
-        # 2. QUADRANT SAMPLING FOR BETTER BALANCE
+        return idx1, idx2, safe_points
+
+    def find_locators(self, grid_points_PLF, PLF_axis, grid_points_SLF, SLF_axis, grid_points_TLF, TLF_axis):
+        cog = self.get_part_cog()
+        axis_map = {'z': (0, 1), '-z': (0, 1), 'x': (1, 2), '-x': (1, 2), 'y': (0, 2), '-y': (0, 2)}
+
+        ######## 1. PLF LOCATORS ###########
+        # 1.1. Safe points grid
+        idx1, idx2, safe_points = self.define_safe_pts_grid (PLF_axis, grid_points_PLF, 8, 4)
+
+        # 1.2. QUADRANT SAMPLING FOR BETTER BALANCE
         # Separate points into 4 lists based on their position relative to CoG
         q_lists = [
             [p for p in safe_points if p[idx1] >= cog[idx1] and p[idx2] >= cog[idx2]],  # Q1
@@ -247,8 +250,8 @@ class Setup_Plan:
                               reverse=True)
             sorted_quadrants.append(sorted_q)
         k = 3  # Start with top 3 furthest points per quadrant
-        max_k = 40  # Safety limit
-        best_trio = None
+        max_k = 20  # Safety limit
+        PLF_locators = None
         max_area = -1
         is_balanced = False
         while k <= max_k and not is_balanced:
@@ -257,7 +260,6 @@ class Setup_Plan:
                 sampling_pool.extend(sq[:k])
             unique_pool = [] #avoid duplicates from previous iteration
             [unique_pool.append(p) for p in sampling_pool if p not in unique_pool]
-
             # Check all combinations in the current pool
             for trio in itertools.combinations(unique_pool, 3):
                 p1, p2, p3 = trio
@@ -270,7 +272,7 @@ class Setup_Plan:
                     area = self.calculate_2d_area(p1, p2, p3, (idx1, idx2))
                     if area > max_area:
                         max_area = area
-                        best_trio = (p1, p2, p3)
+                        PLF_locators = (p1, p2, p3)
                         is_balanced = True
 
             if is_balanced:
@@ -279,69 +281,175 @@ class Setup_Plan:
 
             k += 2  # Increase the depth of the search
 
-        # 3. FINAL FALLBACK (If still no balance, just take the biggest possible)
-        if not best_trio:
+        # 1.3. FINAL FALLBACK (If still no balance, just take the biggest possible)
+        if not PLF_locators:
             print("Final Fallback: No balanced solution possible. Choosing max area.")
             p1 = sorted_quadrants[0][0] if sorted_quadrants[0] else safe_points[0]
             p2 = max(safe_points, key=lambda p: np.sqrt((p[idx1] - p1[idx1])**2 + (p[idx2] - p1[idx2])**2))
             p3 = max(safe_points, key=lambda p: self.calculate_2d_area(p1, p2, p, (idx1, idx2)))
-            best_trio = (p1, p2, p3)
+            PLF_locators = (p1, p2, p3)
             is_balanced = False  # Still unbalanced, but at least we have a solution
 
-        return best_trio, is_balanced
+
+        ######## 2. SLF LOCATORS ###########
+        idx1_slf, idx2_slf, safe_points_slf = self.define_safe_pts_grid (SLF_axis, grid_points_SLF,
+                                                                         30, 15)
+        # 2.1 Determine horizontal axis
+        height_idx = list({0, 1, 2} - set(axis_map))[0] # horizontal axis
+        search_idx = idx1_slf if idx1_slf != height_idx else idx2_slf #width axis
+        # 2.2 Filter to Parallel Points
+        unique_heights = sorted(list(set(p[height_idx] for p in safe_points_slf)))
+        median_height = unique_heights[len(unique_heights) // 2]
+        parallel_points = [p for p in safe_points_slf if p[height_idx] == median_height]
+        if len(parallel_points) < 2:
+            parallel_points = safe_points_slf
+
+        # 2.3 Maximize Distance along the width
+        p1_slf = min(parallel_points, key=lambda p: p[search_idx])
+        p2_slf = max(parallel_points, key=lambda p: p[search_idx])
+        SLF_locators = (p1_slf, p2_slf)
+
+        ######## 3. TLF LOCATOR  ###########
+        idx1_tlf, idx2_tlf, safe_points_tlf = self.define_safe_pts_grid(TLF_axis, grid_points_TLF,
+                                                                        10, 5)
+
+        # Pick the point closest to the geometric center of the safe area for max stability
+        avg_dim1 = np.mean([p[idx1_tlf] for p in safe_points_tlf])
+        avg_dim2 = np.mean([p[idx2_tlf] for p in safe_points_tlf])
+
+        p1_tlf = min(safe_points_tlf, key=lambda p: (p[idx1_tlf] - avg_dim1) ** 2 +
+                                                    (p[idx2_tlf] - avg_dim2) ** 2)
+        TLF_locators = (p1_tlf,)
+
+        return PLF_locators, is_balanced, SLF_locators, TLF_locators
 
     def validate_workholding (self, axis):
         # apply 321 technique based on the final part (worst case scenario)
-        PLFs = []
-        PLF = []
-        SLF = None
-        TLF = None
+        PLFs, SLFs, TLFs = [], [], []
+        PLF, SLF, TLF = [], [], []
 
         ##########################################################
-        # 1. Get stock faces and possible base face (Primary Locating Face)
+        # 1. Get stock faces and possible base face (Primary Locating Face) & SLF & TLF
         stock_faces = self.define_stock_faces_list()
         PLF_total_area = 0
+        # 1.1. Perpendicular faces based on axis (to determine slf and tlf)
+        perpendicular_axis = {'z': ('x', '-x', 'y', '-y'), '-z': ('x', '-x', 'y', '-y'),
+                              'x': ('z', '-z', 'y', '-y'), '-x': ('z', '-z', 'y', '-y'),
+                              'y': ('x', '-x', 'z', '-z'), 'y': ('x', '-x', 'z', '-z')}
+        perp_data = {pa: {'faces': [], 'total_area': 0} for pa in perpendicular_axis[axis]}
         for stock_face in stock_faces:
             sf_axis = stock_face['opposite_TAD']
             sf_idx = stock_face['stock_face_idx']
             sf_center = self.face_data_list[sf_idx]['face_center']
             sf_area = stock_face['area']
+            # 1.2. Determine PLFs
             if sf_axis == axis:
                 PLFs.append({ #list of the coplanar faces in that plane
-                    'PLF_idx': sf_idx,
-                    'PLF_center': sf_center,
+                    'Face_idx': sf_idx,
+                    'Face_center': sf_center,
                     'PLF_area': sf_area
                     })
                 PLF_total_area = PLF_total_area + sf_area
                 print(f"Face {stock_face['stock_face_idx']} is a candidate for PLF of Setup of TAD {axis}")
+            # 1.3. Determine possible SLFs
+            elif sf_axis in perp_data:
+                perp_data[sf_axis]['faces'].append({
+                    'Face_idx': sf_idx,
+                    'Face_center': sf_center,
+                    'SLF_area': sf_area
+                })
+                perp_data[sf_axis]['total_area'] += sf_area
+
 
         ###############################################################
-        # 2. Validate these PLFs and get 3 points
+        # 2. Get SLFs and TLFs faces (perpendicularity & biggest area)
+        slf_axis = max(perp_data, key=lambda k: perp_data[k]['total_area'])
+        SLFs = perp_data[slf_axis]['faces']
+
+        pa1, pa2, pa3, pa4 = perpendicular_axis[axis]
+        new_perp_axis = {pa1: (pa3, pa4), pa2: (pa3, pa4), pa3: (pa1, pa2), pa4: (pa1, pa2)}
+        perp_data2 = {pa: {'faces': [], 'total_area': 0} for pa in new_perp_axis[slf_axis]}
+        for stock_face in stock_faces:
+            sf_axis = stock_face['opposite_TAD']
+            sf_idx = stock_face['stock_face_idx']
+            sf_center = self.face_data_list[sf_idx]['face_center']
+            sf_area = stock_face['area']
+            for sf_axis in perp_data2:
+                perp_data2[sf_axis]['faces'].append({
+                    'Face_idx': sf_idx,
+                    'Face_center': sf_center,
+                    'TLF_area': sf_area
+                })
+                perp_data2[sf_axis]['total_area'] += sf_area
+        tlf_axis = max(perp_data2, key=lambda k: perp_data2[k]['total_area'])
+        TLFs = perp_data2[tlf_axis]['faces']
+
+        ###############################################################
+        # 3. Validate areas based on area ratio (30% of original)
         validated = True
-        # 2.1. Validate based on area ratio (30% of original)
+        # 3.1. PLF
         original_area = self.get_original_stock_area(axis)
         if original_area > 0:
             area_ratio = (PLF_total_area / original_area) * 100
-            #print(f"Total PLF Area: {PLF_total_area:.2f} / Original: {original_area:.2f} ({area_ratio:.1f}%)")
+            # print(f"Total PLF Area: {PLF_total_area:.2f} / Original: {original_area:.2f} ({area_ratio:.1f}%)")
             if area_ratio < 30:
                 print(f"WARNING: Stability compromised! Only {area_ratio:.1f}% of the base remains.")
                 validated = False
 
-        # 2.2 Identify 3 specific locator points based on centers
-        nr_PLFs = len(PLFs)
-        grid_pts = self.generate_locating_grid(PLFs, axis)
-        if len(grid_pts) >= 3 and validated:
-            locators, balanced = self.find_PLF_locators(grid_pts, axis)
+        # 3.2. SLF
+        original_area = self.get_original_stock_area(slf_axis)
+        SLF_total_area = perp_data[slf_axis]['total_area']
+        if original_area > 0:
+            area_ratio = (SLF_total_area / original_area) * 100
+            if area_ratio < 30:
+                print(f"WARNING: Stability compromised! Only {area_ratio:.1f}% of the SLF remains.")
+                validated = False
+
+        # 3.3. TLF
+        original_area = self.get_original_stock_area(tlf_axis)
+        TLF_total_area = perp_data[tlf_axis]['total_area']
+        if original_area > 0:
+            area_ratio = (TLF_total_area / original_area) * 100
+            if area_ratio < 30:
+                print(f"WARNING: Stability compromised! Only {area_ratio:.1f}% of the TLF remains.")
+                validated = False
+
+        #############################################################
+        # 4. Find locator points
+        PLF_grid_pts = self.generate_locating_grid(PLFs, axis)
+        SLF_grid_pts = self.generate_locating_grid(SLFs, slf_axis)
+        TLF_grid_pts = self.generate_locating_grid(TLFs, tlf_axis)
+        PLF_locators, balanced, SLF_locators, TLF_locators = self.find_locators(PLF_grid_pts, axis,
+                                                                                SLF_grid_pts, slf_axis,
+                                                                                TLF_grid_pts, tlf_axis)
+        # 4.1. Find 3 locators in PLF
+        if len(PLF_grid_pts) >= 3 and validated:
             if not balanced:
                 validated = False
-                print("!!Couldn't find a balanced solution!!")
+                print("!!Couldn't find a balanced solution in PLF!!")
             else:
                 PLF = ({
                     'PLF_faces': PLFs,
-                    'PLF_locators': locators
+                    'PLF_locators': PLF_locators
                 })
-                print(f"Primary Locators: {locators}")
+                print(f"Primary Locators: {PLF_locators}")
                 print(f"CoG Balanced: {balanced}")
+
+        # 4.2. Find 2 locators in SLF
+        if len(SLF_grid_pts) >= 2 and validated:
+            SLF = ({
+                'SLF_faces': SLFs,
+                'SLF_locators': SLF_locators
+            })
+            print(f"Secondary Locators: {SLF_locators}")
+
+        # 4.3. Find 1 locator in TLF
+        if len(TLF_grid_pts) >= 1 and validated:
+            TLF = ({
+                'TLF_faces': TLFs,
+                'TLF_locators': TLF_locators
+            })
+            print(f"Terciary Locator: {TLF_locators}")
 
 
         return PLF, SLF, TLF, validated
@@ -519,54 +627,64 @@ class Setup_Plan:
 
             print("-" * 80)
 
-    def visualize_setup_results(self, grid_points, locators=None, cog=None):
+    def visualize_setup_3d(self, PLF_locs=None, SLF_locs=None, TLF_locs=None, cog=None):
         import plotly.graph_objects as go
         import numpy as np
 
-        data = []
+        fig = go.Figure()
 
-        # 1. Plot the Grid Points
-        if grid_points:
-            pts = np.array(grid_points)
-            grid_trace = go.Scatter3d(
-                x=pts[:, 0], y=pts[:, 1], z=pts[:, 2],
-                mode='markers',
-                name='Valid Grid',
-                marker=dict(size=2, color='red', opacity=0.3)
-            )
-            data.append(grid_trace)
+        # 1. Show the Part Mesh (Grey/Translucent for context)
+        all_vertices = []
+        all_triangles = []
+        vertex_offset = 0
 
-        # 2. Plot the Locators (Change symbol to 'circle')
-        if locators:
-            locs = np.array(locators)
-            loc_trace = go.Scatter3d(
-                x=locs[:, 0], y=locs[:, 1], z=locs[:, 2],
-                mode='markers+text',
-                name='3-2-1 Locators',
-                text=["P1", "P2", "P3"],
-                textposition="top center",
-                marker=dict(size=8, color='blue', symbol='circle')  # Fix here
-            )
-            data.append(loc_trace)
+        for face_data in self.face_data_list:
+            vertices = face_data.get('mesh_vertices', [])
+            triangles = face_data.get('mesh_triangles', [])
+            if not vertices: continue
 
-        # 3. Plot the CoG
+            all_vertices.extend(vertices)
+            for tri in triangles:
+                all_triangles.append([tri[0] + vertex_offset, tri[1] + vertex_offset, tri[2] + vertex_offset])
+            vertex_offset += len(vertices)
+
+        if all_vertices:
+            all_vertices = np.array(all_vertices)
+            all_triangles = np.array(all_triangles)
+            fig.add_trace(go.Mesh3d(
+                x=all_vertices[:, 0], y=all_vertices[:, 1], z=all_vertices[:, 2],
+                i=all_triangles[:, 0], j=all_triangles[:, 1], k=all_triangles[:, 2],
+                color='rgb(200, 200, 200)', opacity=0.3, name='Part Body', showlegend=True
+            ))
+
+        # 2. Helper to add locator groups as spheres
+        def add_locators(locs, name, color, labels):
+            if locs:
+                l_pts = np.array(locs)
+                fig.add_trace(go.Scatter3d(
+                    x=l_pts[:, 0], y=l_pts[:, 1], z=l_pts[:, 2],
+                    mode='markers+text', name=name,
+                    text=labels, textposition="top center",
+                    marker=dict(size=10, color=color, symbol='circle',
+                                line=dict(width=2, color='white'))
+                ))
+
+        # Plot the 3-2-1 Points
+        add_locators(PLF_locs, "Primary (PLF)", "blue", ["P1", "P2", "P3"])
+        add_locators(SLF_locs, "Secondary (SLF)", "red", ["S1", "S2"])
+        add_locators(TLF_locs, "Tertiary (TLF)", "green", ["T1"])
+
+        # 3. Plot the CoG (Optional, but helpful for balance context)
         if cog is not None:
-            cog_trace = go.Scatter3d(
+            fig.add_trace(go.Scatter3d(
                 x=[cog[0]], y=[cog[1]], z=[cog[2]],
-                mode='markers',
-                name='Part CoG',
-                marker=dict(size=10, color='green', symbol='diamond')  # Fix here
-            )
-            data.append(cog_trace)
+                mode='markers', name='Part CoG',
+                marker=dict(size=12, color='purple', symbol='diamond')
+            ))
 
-        fig = go.Figure(data=data)
         fig.update_layout(
-            title="Workholding Validation Results",
-            scene=dict(
-                xaxis_title='X',
-                yaxis_title='Y',
-                zaxis_title='Z',
-                aspectmode='data'
-            )
+            title="3-2-1 Workholding Configuration",
+            scene=dict(xaxis_title="X", yaxis_title="Y", zaxis_title="Z", aspectmode="data"),
+            width=1000, height=800
         )
         fig.show()
