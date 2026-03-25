@@ -212,16 +212,28 @@ class Setup_Plan:
             if not (dim1_min + offset_out - 1e-3 <= p[idx1] <= dim1_max - offset_out + 1e-3 and
                     dim2_min + offset_out - 1e-3 <= p[idx2] <= dim2_max - offset_out + 1e-3):
                 continue
-            test_points = [
-                (round(p[idx1] + offset_in, 3), round(p[idx2], 3)),
-                (round(p[idx1] - offset_in, 3), round(p[idx2], 3)),
-                (round(p[idx1], 3), round(p[idx2] + offset_in, 3)),
-                (round(p[idx1], 3), round(p[idx2] - offset_in, 3))
-            ]
-            if all(tp in grid_set for tp in test_points):
+            is_point_safe = True
+            i=offset_in
+            while i > 0:
+                test_points = [
+                    (round(p[idx1] + i, 3), round(p[idx2], 3)),
+                    (round(p[idx1] - i, 3), round(p[idx2], 3)),
+                    (round(p[idx1], 3), round(p[idx2] + i, 3)),
+                    (round(p[idx1], 3), round(p[idx2] - i, 3)),
+                    (round(p[idx1] + i, 3), round(p[idx2] + i, 3)),
+                    (round(p[idx1] - i, 3), round(p[idx2] + i, 3)),
+                    (round(p[idx1] + i, 3), round(p[idx2] - i, 3)),
+                    (round(p[idx1] - i, 3), round(p[idx2] - i, 3))
+                ]
+                # If any of these 8 points are NOT in the grid, it's near an edge/hole
+                if not all(tc in grid_set for tc in test_points):
+                    is_point_safe = False
+                    break
+                i -= 1
+
+            if is_point_safe:
                 safe_points.append(p)
         print(f"Safe points: {len(safe_points)}")
-        # self.visualize_setup_results(safe_points)
         if len(safe_points) < 3:
             print("Fallback: Offset too large.")
             safe_points = grid_points
@@ -233,53 +245,72 @@ class Setup_Plan:
         axis_map = {'z': (0, 1), '-z': (0, 1), 'x': (1, 2), '-x': (1, 2), 'y': (0, 2), '-y': (0, 2)}
 
         ######## 1. PLF LOCATORS ###########
-        # 1.1. Safe points grid
-        idx1, idx2, safe_points = self.define_safe_pts_grid (PLF_axis, grid_points_PLF, 8, 4)
+        tries = 0
+        while tries <= 3:
+            if tries == 0:
+                offset_out_plf = 15
+                offset_in_plf = 15
+            elif tries == 1:
+                offset_out_plf = 10
+                offset_in_plf = 10
+            elif tries == 2:
+                offset_out_plf = 5
+                offset_in_plf = 5
+            elif tries ==3:
+                offset_out_plf = 0
+                offset_in_plf = 0
+            # 1.1. Safe points grid
+            idx1, idx2, safe_points = self.define_safe_pts_grid(PLF_axis, grid_points_PLF, offset_out_plf, offset_in_plf)
 
-        # 1.2. QUADRANT SAMPLING FOR BETTER BALANCE
-        # Separate points into 4 lists based on their position relative to CoG
-        q_lists = [
-            [p for p in safe_points if p[idx1] >= cog[idx1] and p[idx2] >= cog[idx2]],  # Q1
-            [p for p in safe_points if p[idx1] < cog[idx1] and p[idx2] >= cog[idx2]],  # Q2
-            [p for p in safe_points if p[idx1] < cog[idx1] and p[idx2] < cog[idx2]],  # Q3
-            [p for p in safe_points if p[idx1] >= cog[idx1] and p[idx2] < cog[idx2]]  # Q4
-        ]
-        sorted_quadrants = []
-        for q in q_lists:
-            sorted_q = sorted(q, key=lambda p: np.sqrt((p[idx1] - cog[idx1]) ** 2 + (p[idx2] - cog[idx2]) ** 2),
-                              reverse=True)
-            sorted_quadrants.append(sorted_q)
-        k = 3  # Start with top 3 furthest points per quadrant
-        max_k = 20  # Safety limit
-        PLF_locators = None
-        max_area = -1
-        is_balanced = False
-        while k <= max_k and not is_balanced:
-            sampling_pool = []
-            for sq in sorted_quadrants:
-                sampling_pool.extend(sq[:k])
-            unique_pool = [] #avoid duplicates from previous iteration
-            [unique_pool.append(p) for p in sampling_pool if p not in unique_pool]
-            # Check all combinations in the current pool
-            for trio in itertools.combinations(unique_pool, 3):
-                p1, p2, p3 = trio
-                balanced = self._point_in_triangle_2d(cog[idx1], cog[idx2],
-                                                      p1[idx1], p1[idx2],
-                                                      p2[idx1], p2[idx2],
-                                                      p3[idx1], p3[idx2])
+            # 1.2. QUADRANT SAMPLING FOR BETTER BALANCE
+            # Separate points into 4 lists based on their position relative to CoG
+            q_lists = [
+                [p for p in safe_points if p[idx1] >= cog[idx1] and p[idx2] >= cog[idx2]],  # Q1
+                [p for p in safe_points if p[idx1] < cog[idx1] and p[idx2] >= cog[idx2]],  # Q2
+                [p for p in safe_points if p[idx1] < cog[idx1] and p[idx2] < cog[idx2]],  # Q3
+                [p for p in safe_points if p[idx1] >= cog[idx1] and p[idx2] < cog[idx2]]  # Q4
+            ]
+            sorted_quadrants = []
+            for q in q_lists:
+                sorted_q = sorted(q, key=lambda p: np.sqrt((p[idx1] - cog[idx1]) ** 2 + (p[idx2] - cog[idx2]) ** 2),
+                                  reverse=True)
+                sorted_quadrants.append(sorted_q)
+            k = 3  # Start with top 3 furthest points per quadrant
+            max_k = 20  # Safety limit
+            PLF_locators = None
+            max_area = -1
+            is_balanced = False
+            while k <= max_k and not is_balanced:
+                sampling_pool = []
+                for sq in sorted_quadrants:
+                    sampling_pool.extend(sq[:k])
+                unique_pool = []  # avoid duplicates from previous iteration
+                [unique_pool.append(p) for p in sampling_pool if p not in unique_pool]
+                # Check all combinations in the current pool
+                for trio in itertools.combinations(unique_pool, 3):
+                    p1, p2, p3 = trio
+                    balanced = self._point_in_triangle_2d(cog[idx1], cog[idx2],
+                                                          p1[idx1], p1[idx2],
+                                                          p2[idx1], p2[idx2],
+                                                          p3[idx1], p3[idx2])
 
-                if balanced:
-                    area = self.calculate_2d_area(p1, p2, p3, (idx1, idx2))
-                    if area > max_area:
-                        max_area = area
-                        PLF_locators = (p1, p2, p3)
-                        is_balanced = True
+                    if balanced:
+                        area = self.calculate_2d_area(p1, p2, p3, (idx1, idx2))
+                        if area > max_area:
+                            max_area = area
+                            PLF_locators = (p1, p2, p3)
+                            is_balanced = True
 
+                if is_balanced:
+                    print(f"Success: Balanced solution found at k={k}")
+                    break
+
+                k += 2  # Increase the depth of the search
             if is_balanced:
-                print(f"Success: Balanced solution found at k={k}")
+                print(f"Success: Balanced solution found at try={tries}")
                 break
+            tries += 1
 
-            k += 2  # Increase the depth of the search
 
         # 1.3. FINAL FALLBACK (If still no balance, just take the biggest possible)
         if not PLF_locators:
@@ -293,7 +324,7 @@ class Setup_Plan:
 
         ######## 2. SLF LOCATORS ###########
         idx1_slf, idx2_slf, safe_points_slf = self.define_safe_pts_grid (SLF_axis, grid_points_SLF,
-                                                                         30, 15)
+                                                                         10, 10)
         # 2.1 Determine horizontal axis
         height_idx = list({0, 1, 2} - set(axis_map))[0] # horizontal axis
         search_idx = idx1_slf if idx1_slf != height_idx else idx2_slf #width axis
@@ -311,8 +342,8 @@ class Setup_Plan:
 
         ######## 3. TLF LOCATOR  ###########
         idx1_tlf, idx2_tlf, safe_points_tlf = self.define_safe_pts_grid(TLF_axis, grid_points_TLF,
-                                                                        10, 5)
-
+                                                                        10, 10)
+        #self.visualize_safe_points(grid_points_TLF, safe_points_tlf, TLF_axis)
         # Pick the point closest to the geometric center of the safe area for max stability
         avg_dim1 = np.mean([p[idx1_tlf] for p in safe_points_tlf])
         avg_dim2 = np.mean([p[idx2_tlf] for p in safe_points_tlf])
@@ -320,6 +351,11 @@ class Setup_Plan:
         p1_tlf = min(safe_points_tlf, key=lambda p: (p[idx1_tlf] - avg_dim1) ** 2 +
                                                     (p[idx2_tlf] - avg_dim2) ** 2)
         TLF_locators = (p1_tlf,)
+
+        #self.visualize_safe_points(grid_points_PLF, safe_points, PLF_axis)
+        #self.visualize_safe_points(grid_points_SLF, safe_points_slf, SLF_axis)
+        #self.visualize_safe_points(grid_points_TLF, safe_points_tlf, TLF_axis)
+
 
         return PLF_locators, is_balanced, SLF_locators, TLF_locators
 
@@ -374,12 +410,13 @@ class Setup_Plan:
             sf_idx = stock_face['stock_face_idx']
             sf_center = self.face_data_list[sf_idx]['face_center']
             sf_area = stock_face['area']
-            for sf_axis in perp_data2:
+            if sf_axis in perp_data2:
                 perp_data2[sf_axis]['faces'].append({
                     'Face_idx': sf_idx,
                     'Face_center': sf_center,
                     'TLF_area': sf_area
                 })
+                print(f"area of face {sf_idx} is {sf_area}")
                 perp_data2[sf_axis]['total_area'] += sf_area
         tlf_axis = max(perp_data2, key=lambda k: perp_data2[k]['total_area'])
         TLFs = perp_data2[tlf_axis]['faces']
@@ -526,7 +563,9 @@ class Setup_Plan:
                 'sequence': [f['feat_idx'] for f in ordered_sequence],
                 'extra_features': extra_features_ids,
                 'is_extra_only': is_extra_setup_only,
-                'PLF': PLF
+                'PLF': PLF,
+                'SLF': SLF,
+                'TLF': TLF
             })
 
             # Mark these as done so they aren't produced twice in another setup
@@ -627,6 +666,37 @@ class Setup_Plan:
 
             print("-" * 80)
 
+    def visualize_safe_points(self, raw_grid, safe_points, axis_label):
+        import plotly.graph_objects as go
+        import numpy as np
+
+        fig = go.Figure()
+
+        # 1. Plot Raw Grid (Light Red)
+        raw_pts = np.array(raw_grid)
+        fig.add_trace(go.Scatter3d(
+            x=raw_pts[:, 0], y=raw_pts[:, 1], z=raw_pts[:, 2],
+            mode='markers',
+            name='Raw Grid Points',
+            marker=dict(size=2, color='red', opacity=0.2)
+        ))
+
+        # 2. Plot Safe Points (Solid Blue)
+        if safe_points:
+            s_pts = np.array(safe_points)
+            fig.add_trace(go.Scatter3d(
+                x=s_pts[:, 0], y=s_pts[:, 1], z=s_pts[:, 2],
+                mode='markers',
+                name='Safe Points (After Offset)',
+                marker=dict(size=4, color='blue', opacity=0.8)
+            ))
+
+        fig.update_layout(
+            title=f"Safe Point Analysis: {axis_label} Axis",
+            scene=dict(xaxis_title="X", yaxis_title="Y", zaxis_title="Z", aspectmode="data")
+        )
+        fig.show()
+
     def visualize_setup_3d(self, PLF_locs=None, SLF_locs=None, TLF_locs=None, cog=None):
         import plotly.graph_objects as go
         import numpy as np
@@ -686,5 +756,96 @@ class Setup_Plan:
             title="3-2-1 Workholding Configuration",
             scene=dict(xaxis_title="X", yaxis_title="Y", zaxis_title="Z", aspectmode="data"),
             width=1000, height=800
+        )
+        fig.show()
+
+    def visualize_all_setups_3d(self, optimized_plan):
+        import plotly.graph_objects as go
+        import numpy as np
+
+        fig = go.Figure()
+
+        # 1. Part Body (Opacity 0.5)
+        all_vertices = []
+        all_triangles = []
+        vertex_offset = 0
+        for face_data in self.face_data_list:
+            vertices = face_data.get('mesh_vertices', [])
+            triangles = face_data.get('mesh_triangles', [])
+            if not vertices: continue
+            all_vertices.extend(vertices)
+            for tri in triangles:
+                all_triangles.append([tri[0] + vertex_offset, tri[1] + vertex_offset, tri[2] + vertex_offset])
+            vertex_offset += len(vertices)
+
+        if all_vertices:
+            all_vertices = np.array(all_vertices)
+            all_triangles = np.array(all_triangles)
+            fig.add_trace(go.Mesh3d(
+                x=all_vertices[:, 0], y=all_vertices[:, 1], z=all_vertices[:, 2],
+                i=all_triangles[:, 0], j=all_triangles[:, 1], k=all_triangles[:, 2],
+                color='rgb(210, 210, 210)', opacity=0.5, name='Part Body',
+                showlegend=True, hoverinfo='skip'
+            ))
+
+        # 2. Setup-specific Locators
+        for idx, step in enumerate(optimized_plan):
+            axis = step['setup']
+
+            # Extract points
+            p_pts = step.get('PLF', {}).get('PLF_locators', [])
+            s_pts = step.get('SLF', {}).get('SLF_locators', [])
+            t_pts = step.get('TLF', {}).get('TLF_locators', [])
+
+            # Primary Locators - RED
+            if p_pts:
+                pts = np.array(p_pts)
+                fig.add_trace(go.Scatter3d(
+                    x=pts[:, 0], y=pts[:, 1], z=pts[:, 2],
+                    mode='markers+text', name=f"Setup {axis} (Primary)",
+                    legendgroup=f"group{axis}",
+                    text=[f"P1", f"P2", f"P3"],
+                    textposition="top center",
+                    marker=dict(size=8, color='red', symbol='circle', line=dict(width=1, color='white'))
+                ))
+
+            # Secondary Locators - BLUE
+            if s_pts:
+                pts = np.array(s_pts)
+                fig.add_trace(go.Scatter3d(
+                    x=pts[:, 0], y=pts[:, 1], z=pts[:, 2],
+                    mode='markers+text', name=f"Setup {axis} (Secondary)",
+                    legendgroup=f"group{axis}",
+                    showlegend=False,
+                    text=[f"S1", f"S2"],
+                    textposition="top center",
+                    marker=dict(size=8, color='blue', symbol='circle', line=dict(width=1, color='white'))
+                ))
+
+            # Tertiary Locators - GREEN
+            if t_pts:
+                pts = np.array(t_pts)
+                fig.add_trace(go.Scatter3d(
+                    x=pts[:, 0], y=pts[:, 1], z=pts[:, 2],
+                    mode='markers+text', name=f"Setup {axis} (Tertiary)",
+                    legendgroup=f"group{axis}",
+                    showlegend=False,
+                    text=[f"T1"],
+                    textposition="top center",
+                    marker=dict(size=8, color='green', symbol='circle', line=dict(width=1, color='white'))
+                ))
+
+        # 3. Restored Diamond CoG
+        cog = self.get_part_cog()
+        fig.add_trace(go.Scatter3d(
+            x=[cog[0]], y=[cog[1]], z=[cog[2]],
+            mode='markers', name='Part CoG',
+            marker=dict(size=12, color='purple', symbol='diamond')
+        ))
+
+        fig.update_layout(
+            title="3-2-1 Workholding: Red(P), Blue(S), Green(T)",
+            scene=dict(xaxis_title="X", yaxis_title="Y", zaxis_title="Z", aspectmode="data"),
+            legend=dict(itemsizing='constant', title_text="Click to Toggle Setups")
         )
         fig.show()

@@ -26,11 +26,12 @@ def main():
     # 3. Process Planning & Workholding Validation
     print("\n" + "=" * 30 + "\nWORKHOLDING VALIDATION\n" + "=" * 30)
     process_planner = Setup_Plan(my_shape)
-    #optimized_plan = process_planner.generate_optimized_plan()
+    optimized_plan = process_planner.generate_optimized_plan()
+    process_planner.visualize_all_setups_3d(optimized_plan)
 
-    #'''
+    '''
     # --- TEST 3-2-1 CONFIGURATION ---
-    test_axis = '-z'
+    test_axis = 'z'
 
     # 1. Run the full validation to get PLF, SLF, and TLF locators
     print(f"Calculating full 3-2-1 setup for {test_axis}...")
@@ -43,13 +44,6 @@ def main():
         t_locs = TLF_res['TLF_locators']
         cog_point = process_planner.get_part_cog()
 
-        # 2. Visualize only the part and the locators
-        process_planner.visualize_setup_3d(
-            PLF_locs=p_locs,
-            SLF_locs=s_locs,
-            TLF_locs=t_locs,
-            cog=cog_point
-        )
     else:
         print("Setup could not be validated.")#'''
 
@@ -59,7 +53,7 @@ def main():
     choice = input(
         "Visualize:"
         "(0) Only Features,"
-        "(1) Features + Locators ").lower()
+        "(1) Locators ").lower()
 
     if choice == '0':
         recognizer.visualize_features_3d(
@@ -71,7 +65,12 @@ def main():
         )
 
     if choice == '1':
-        process_planner.visualize_everything()
+        process_planner.visualize_setup_3d(
+            PLF_locs=p_locs,
+            SLF_locs=s_locs,
+            TLF_locs=t_locs,
+            cog=cog_point
+        )
 
 
 if __name__ == "__main__":
