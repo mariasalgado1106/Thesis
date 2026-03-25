@@ -215,15 +215,16 @@ class Setup_Plan:
             is_point_safe = True
             i=offset_in
             while i > 0:
+                j = round(i/2)
                 test_points = [
                     (round(p[idx1] + i, 3), round(p[idx2], 3)),
                     (round(p[idx1] - i, 3), round(p[idx2], 3)),
                     (round(p[idx1], 3), round(p[idx2] + i, 3)),
                     (round(p[idx1], 3), round(p[idx2] - i, 3)),
-                    (round(p[idx1] + i, 3), round(p[idx2] + i, 3)),
-                    (round(p[idx1] - i, 3), round(p[idx2] + i, 3)),
-                    (round(p[idx1] + i, 3), round(p[idx2] - i, 3)),
-                    (round(p[idx1] - i, 3), round(p[idx2] - i, 3))
+                    (round(p[idx1] + j, 3), round(p[idx2] + j, 3)),
+                    (round(p[idx1] - j, 3), round(p[idx2] + j, 3)),
+                    (round(p[idx1] + j, 3), round(p[idx2] - j, 3)),
+                    (round(p[idx1] - j, 3), round(p[idx2] - j, 3))
                 ]
                 # If any of these 8 points are NOT in the grid, it's near an edge/hole
                 if not all(tc in grid_set for tc in test_points):
@@ -234,9 +235,6 @@ class Setup_Plan:
             if is_point_safe:
                 safe_points.append(p)
         print(f"Safe points: {len(safe_points)}")
-        if len(safe_points) < 3:
-            print("Fallback: Offset too large.")
-            safe_points = grid_points
 
         return idx1, idx2, safe_points
 
@@ -246,21 +244,14 @@ class Setup_Plan:
 
         ######## 1. PLF LOCATORS ###########
         tries = 0
+        offset_plf = 15
         while tries <= 3:
-            if tries == 0:
-                offset_out_plf = 15
-                offset_in_plf = 15
-            elif tries == 1:
-                offset_out_plf = 10
-                offset_in_plf = 10
-            elif tries == 2:
-                offset_out_plf = 5
-                offset_in_plf = 5
-            elif tries ==3:
-                offset_out_plf = 0
-                offset_in_plf = 0
             # 1.1. Safe points grid
-            idx1, idx2, safe_points = self.define_safe_pts_grid(PLF_axis, grid_points_PLF, offset_out_plf, offset_in_plf)
+            idx1, idx2, safe_points = self.define_safe_pts_grid(PLF_axis, grid_points_PLF, offset_plf, offset_plf)
+            if len(safe_points) < 3:
+                tries += 1
+                offset_plf -= 5
+                continue
 
             # 1.2. QUADRANT SAMPLING FOR BETTER BALANCE
             # Separate points into 4 lists based on their position relative to CoG
@@ -310,6 +301,7 @@ class Setup_Plan:
                 print(f"Success: Balanced solution found at try={tries}")
                 break
             tries += 1
+            offset_plf -= 5
 
 
         # 1.3. FINAL FALLBACK (If still no balance, just take the biggest possible)
@@ -323,27 +315,40 @@ class Setup_Plan:
 
 
         ######## 2. SLF LOCATORS ###########
-        idx1_slf, idx2_slf, safe_points_slf = self.define_safe_pts_grid (SLF_axis, grid_points_SLF,
-                                                                         10, 10)
-        # 2.1 Determine horizontal axis
-        height_idx = list({0, 1, 2} - set(axis_map))[0] # horizontal axis
-        search_idx = idx1_slf if idx1_slf != height_idx else idx2_slf #width axis
-        # 2.2 Filter to Parallel Points
-        unique_heights = sorted(list(set(p[height_idx] for p in safe_points_slf)))
+        offset_slf = 15
+        idx1_slf, idx2_slf, safe_points_slf = self.define_safe_pts_grid(SLF_axis, grid_points_SLF,
+                                                                        offset_slf, offset_slf-5)
+        while len(safe_points_slf) < 2:
+            offset_slf -= 5
+            if offset_slf < 0:
+                offset_slf = 0
+            idx1_slf, idx2_slf, safe_points_slf = self.define_safe_pts_grid (SLF_axis, grid_points_SLF,
+                                                                         offset_slf, offset_slf)
+        # 2.1 Determine height, normal and width axis
+        plf_normal_idx = list({0, 1, 2} - set(axis_map[PLF_axis.lower()]))[0] #height
+        slf_normal_idx = list({0, 1, 2} - set(axis_map[SLF_axis.lower()]))[0]
+        search_idx = list({0, 1, 2} - {plf_normal_idx, slf_normal_idx})[0] #width, tlf axis
+
+        # 2.2. Filter to Parallel Points (same height)
+        unique_heights = sorted(list(set(p[plf_normal_idx] for p in safe_points_slf)))
         median_height = unique_heights[len(unique_heights) // 2]
-        parallel_points = [p for p in safe_points_slf if p[height_idx] == median_height]
+        parallel_points = [p for p in safe_points_slf if p[plf_normal_idx] == median_height]
         if len(parallel_points) < 2:
             parallel_points = safe_points_slf
 
-        # 2.3 Maximize Distance along the width
+        # 3. Maximize Distance along the width (search_idx)
         p1_slf = min(parallel_points, key=lambda p: p[search_idx])
         p2_slf = max(parallel_points, key=lambda p: p[search_idx])
         SLF_locators = (p1_slf, p2_slf)
 
         ######## 3. TLF LOCATOR  ###########
+        offset_tlf = 10
         idx1_tlf, idx2_tlf, safe_points_tlf = self.define_safe_pts_grid(TLF_axis, grid_points_TLF,
-                                                                        10, 10)
-        #self.visualize_safe_points(grid_points_TLF, safe_points_tlf, TLF_axis)
+                                                                        offset_tlf, offset_tlf-3)
+        while len(safe_points_tlf) < 1:
+            offset_tlf -= 5
+            idx1_tlf, idx2_tlf, safe_points_tlf = self.define_safe_pts_grid(TLF_axis, grid_points_TLF,
+                                                                            offset_tlf, offset_tlf)
         # Pick the point closest to the geometric center of the safe area for max stability
         avg_dim1 = np.mean([p[idx1_tlf] for p in safe_points_tlf])
         avg_dim2 = np.mean([p[idx2_tlf] for p in safe_points_tlf])
@@ -354,8 +359,8 @@ class Setup_Plan:
 
         #self.visualize_safe_points(grid_points_PLF, safe_points, PLF_axis)
         #self.visualize_safe_points(grid_points_SLF, safe_points_slf, SLF_axis)
+        #self.visualize_safe_points(grid_points_SLF, parallel_points, SLF_axis)
         #self.visualize_safe_points(grid_points_TLF, safe_points_tlf, TLF_axis)
-
 
         return PLF_locators, is_balanced, SLF_locators, TLF_locators
 
@@ -371,7 +376,7 @@ class Setup_Plan:
         # 1.1. Perpendicular faces based on axis (to determine slf and tlf)
         perpendicular_axis = {'z': ('x', '-x', 'y', '-y'), '-z': ('x', '-x', 'y', '-y'),
                               'x': ('z', '-z', 'y', '-y'), '-x': ('z', '-z', 'y', '-y'),
-                              'y': ('x', '-x', 'z', '-z'), 'y': ('x', '-x', 'z', '-z')}
+                              'y': ('x', '-x', 'z', '-z'), '-y': ('x', '-x', 'z', '-z')}
         perp_data = {pa: {'faces': [], 'total_area': 0} for pa in perpendicular_axis[axis]}
         for stock_face in stock_faces:
             sf_axis = stock_face['opposite_TAD']

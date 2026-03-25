@@ -9,7 +9,7 @@ from SetupPlanning.Setup_Plan import Setup_Plan
 
 def main():
     # 1. Load STEP file
-    step_file = os.path.join("STEPFiles", "Part4.stp")
+    step_file = os.path.join("STEPFiles", "Part2.stp")
     my_shape = load_step_file(step_file)
     if not my_shape:
         print("Failed to load shape.")
@@ -27,11 +27,10 @@ def main():
     print("\n" + "=" * 30 + "\nWORKHOLDING VALIDATION\n" + "=" * 30)
     process_planner = Setup_Plan(my_shape)
     optimized_plan = process_planner.generate_optimized_plan()
-    process_planner.visualize_all_setups_3d(optimized_plan)
 
     '''
     # --- TEST 3-2-1 CONFIGURATION ---
-    test_axis = 'z'
+    test_axis = 'y'
 
     # 1. Run the full validation to get PLF, SLF, and TLF locators
     print(f"Calculating full 3-2-1 setup for {test_axis}...")
@@ -65,12 +64,7 @@ def main():
         )
 
     if choice == '1':
-        process_planner.visualize_setup_3d(
-            PLF_locs=p_locs,
-            SLF_locs=s_locs,
-            TLF_locs=t_locs,
-            cog=cog_point
-        )
+        process_planner.visualize_all_setups_3d(optimized_plan)
 
 
 if __name__ == "__main__":
