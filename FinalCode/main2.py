@@ -5,6 +5,7 @@ from FeatureRecognition.feature_recognition import FeatureRecognition
 from FeatureRecognition.geometry_analysis import load_step_file
 from SetupPlanning.TAD_and_Dependencies import TAD_Extraction, Dependencies
 from SetupPlanning.Setup_Plan import Setup_Plan
+from SetupPlanning.Workholding import Workholding
 
 
 def main():
@@ -26,7 +27,9 @@ def main():
     # 3. Process Planning & Workholding Validation
     print("\n" + "=" * 30 + "\nWORKHOLDING VALIDATION\n" + "=" * 30)
     process_planner = Setup_Plan(my_shape)
-    optimized_plan = process_planner.generate_optimized_plan()
+    #optimized_plan = process_planner.generate_optimized_plan()
+
+    workholding = Workholding(my_shape)
 
     '''
     # --- TEST 3-2-1 CONFIGURATION ---
@@ -46,6 +49,15 @@ def main():
     else:
         print("Setup could not be validated.")#'''
 
+    '''
+    #TEST WORKHOLDING (VIZUALIZE THE COMMON AREA)
+    test_axis = 'x'
+    opposite_axis = {'z': '-z', '-z': 'z',
+                     'x': '-x', '-x': 'x',
+                     'y': '-y', '-y': 'y'}
+    test_axis_2 = opposite_axis[test_axis]
+    common_points, common_area = workholding.common_parallel_area(test_axis, test_axis_2)
+    workholding.visualize_common_area(test_axis, test_axis_2, common_points) #'''
 
     # 4. Visualization
     print("\n" + "=" * 30 + "\nVISUALIZATION\n" + "=" * 30)
