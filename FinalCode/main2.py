@@ -30,6 +30,7 @@ def main():
     #optimized_plan = process_planner.generate_optimized_plan()
 
     workholding = Workholding(my_shape)
+    workholding.final_clamping_suggestion()
 
     '''
     # --- TEST 3-2-1 CONFIGURATION ---
@@ -51,7 +52,7 @@ def main():
 
     '''
     #TEST WORKHOLDING (VIZUALIZE THE COMMON AREA)
-    test_axis = 'x'
+    test_axis = 'y'
     opposite_axis = {'z': '-z', '-z': 'z',
                      'x': '-x', '-x': 'x',
                      'y': '-y', '-y': 'y'}

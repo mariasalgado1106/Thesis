@@ -22,15 +22,7 @@ class Workholding:
         self.stock_faces = self.setup_plan.define_stock_faces_list()
         self.optimized_plan = self.setup_plan.generate_optimized_plan()
 
-    def VicesLibrary (self):
-        vices = [
-            {'name': 'Standard 6-inch', 'jaw_width': 152.4, 'max_opening': 150.0, 'jaw_height': 44.0},
-            {'name': 'Compact 4-inch', 'jaw_width': 101.6, 'max_opening': 100.0, 'jaw_height': 35.0}
-        ]
-        return vices
-
-    # Find 2 pairs of parallel faces and their common points in a plane? ->
-    # ->use this common area to help determine which ones are best
+    # Helper functions
     def generate_grid (self, axis, step_size=0.5):
         axis_map = {'z': (0, 1, 2), '-z': (0, 1, 2),
                     'x': (1, 2, 0), '-x': (1, 2, 0),
@@ -67,9 +59,9 @@ class Workholding:
                     'y': (0, 2, 1), '-y': (0, 2, 1)}
         idx1, idx2, fixed_idx = axis_map[fa1]
         bounds = [(self.xmin, self.xmax), (self.ymin, self.ymax), (self.zmin, self.zmax)]
-        clamping_height = 20
+        clamping_height = 5
         dim1_range = np.arange(bounds[idx1][0], bounds[idx1][1], step_size)
-        dim2_range = np.arange(bounds[idx2][0], bounds[idx2][0] + clamping_height , step_size)
+        dim2_range = np.arange(bounds[idx2][0], bounds[idx2][1], step_size)
         faces1, faces2, grid_points = [], [], []
         for face in self.stock_faces:
             if face['opposite_TAD'] == fa1:
@@ -98,24 +90,215 @@ class Workholding:
         print(f"Total Common Clamping Area: {total_area} mm²")
         return grid_points, total_area
 
+    def find_height_and_length (self, common_pts, setup, face_axis):
+        dual_axis_map = { #input (setup, face axis) -> output(lenghth and height)
+            'z': {'x': (1, 2), '-x': (1, 2), 'y': (0, 2), '-y': (0, 2)},
+            '-z': {'x': (1, 2), '-x': (1, 2), 'y': (0, 2), '-y': (0, 2)},
+            'x': {'y': (2, 0), '-y': (2, 0), 'z': (1, 0), '-z': (1, 0)},
+            '-x': {'y': (2, 0), '-y': (2, 0), 'z': (1, 0), '-z': (1, 0)},
+            'y': {'x': (2, 1), '-x': (2, 1), 'z': (0, 1), '-z': (0, 1)},
+            '-y': {'x': (2, 1), '-x': (2, 1), 'z': (0, 1), '-z': (0, 1)}
+        }
+        if not common_pts:
+            return 0, 0, 0
+        idx_len, idx_height = dual_axis_map[setup][face_axis]
+        pts_arr = np.array(common_pts)
 
+        # Define stock_min_h based on the current height index
+        is_positive_setup = ['x', 'y', 'z']
+        if setup in is_positive_setup:
+            stock_min_h = [self.xmax, self.ymax, self.zmax][idx_height]
+        else:
+            stock_min_h = [self.xmin, self.ymin, self.zmin][idx_height]
+        print(stock_min_h)
+
+        step_size = 0.5
+
+        # 1. Group points by their "length" coordinate (columns)
+        columns = {}
+        for p in pts_arr:
+            l_coord = round(p[idx_len], 2)
+            if l_coord not in columns:
+                columns[l_coord] = []
+            columns[l_coord].append(p[idx_height])
+
+        # 2. For every column, find its "continuous height" from the bottom
+        column_heights = []
+        for l_coord, heights in columns.items():
+            if setup in is_positive_setup:
+                h_sorted = sorted(heights, reverse=True)
+            else:
+                h_sorted = sorted(heights)
+            h_limit = h_sorted[0]
+
+            for i in range(1, len(h_sorted)):
+                if abs(h_sorted[i] - h_sorted[i - 1]) > (step_size * 1.1):
+                    break
+                else:
+                    h_limit = h_sorted[i]
+            column_heights.append(abs(round(stock_min_h - h_limit)))
+            continue
+
+
+        # 3. H_min is the MINIMUM of all those continuous columns
+        h_min = min(column_heights) if column_heights else 0
+
+        # max_h is the absolute highest point found anywhere in the grid
+        max_h = np.max(pts_arr[:, idx_height]) - stock_min_h
+        # max_len is the total horizontal span
+        max_len = np.max(pts_arr[:, idx_len]) - np.min(pts_arr[:, idx_len])
+
+        print(f"min height {h_min}")
+
+        return max_len, h_min, max_h
+
+    # ACTUAL
     def clamping_faces (self):
         perpendicular_axis = {'z': ('x', '-x', 'y', '-y'), '-z': ('x', '-x', 'y', '-y'),
                               'x': ('z', '-z', 'y', '-y'), '-x': ('z', '-z', 'y', '-y'),
                               'y': ('x', '-x', 'z', '-z'), '-y': ('x', '-x', 'z', '-z')}
+        clamping_faces_info = []
+        print("\n--- ANALYZING CLAMPING OPTIONS PER SETUP ---")
         for setup in self.optimized_plan:
             setup_axis = setup['setup']
             pf1,pf2,pf3,pf4 = perpendicular_axis[setup_axis]
             pairs_parallel_faces = {(pf1,pf2), (pf3,pf4)}
+            clamping_pairs = []
+            print(f"\nSetup {setup_axis}:")
+
             for fa1,fa2 in pairs_parallel_faces: #fa = face axis
                 max_min_pts = {'x': (self.xmin, self.xmax),
                                'y': (self.ymin, self.ymax),
                                'z': (self.zmin, self.zmax)}
-                min, max = max_min_pts[fa1]
-                clamping_width = max - min
-                common_pts, common_area =self.common_parallel_area(fa1, fa2)
+                clamping_width = abs(max_min_pts[fa1][1] - max_min_pts[fa1][0])
+                idx_v = {'z': 2, '-z': 2, 'x': 0, '-x': 0, 'y': 1, '-y': 1}[setup_axis]
+                axis_letter = setup_axis.replace('-', '')
+                total_part_height = max_min_pts[axis_letter][1] - max_min_pts[axis_letter][0]
+                common_pts, common_area = self.common_parallel_area(fa1, fa2)
+                if not common_pts:
+                    print(f"  Pairs {fa1}/{fa2}: No common area found.")
+                    continue
+                max_len, h_min, clamping_top = self.find_height_and_length(common_pts, setup_axis, fa1)
+                # GAP AT BOTTOM
+                stock_min_h = max_min_pts[axis_letter][0]
+                min_h_in_grid = np.min(np.array(common_pts)[:, idx_v]) - stock_min_h
+
+                # --- LOCAL STABILITY SCORE ---
+                # Ratio of common area vs stock face area * contact length ratio
+                # Helps choose the best face pair for THIS setup
+                stock_area = abs(max_min_pts[pf1][1] - max_min_pts[pf1][0]) * \
+                             abs(max_min_pts[pf3][1] - max_min_pts[pf3][0])
+                # tipping risk-> If h_min is 5mm and total_part_height is 100mm, score is low
+                height_stability = h_min / (total_part_height + 1e-6)
+                # Penalty if we aren't clamping at the floor (min_h_in_grid > 0)
+                floor_penalty = 1.0 if min_h_in_grid < 0.6 else (0.5 / min_h_in_grid)
+
+                stability_score = (common_area / stock_area) * height_stability * floor_penalty* (max_len / (
+                            max_min_pts[fa1][1] - max_min_pts[fa1][0]))
+
+                print(f"  Pairs {fa1}/{fa2} -> Width: {clamping_width:.2f}, "
+                      f"Area: {common_area:.2f}, Stab: {stability_score:.4f}")
+
+                clamping_pairs.append({
+                    'face_axis': (fa1, fa2),
+                    'common_pts': common_pts,
+                    'common_area': common_area,
+                    'clamping_width': clamping_width,
+                    'clamping_max_length': max_len,
+                    'clamping_min_height': h_min,
+                    'clamping_max_height': clamping_top,
+                    'stability_score': stability_score
+                })
+            clamping_faces_info.append({
+                'setup_axis': setup_axis,
+                'face_pairs': clamping_pairs
+            })
+
+        return clamping_faces_info
+
+    def final_clamping_suggestion(self):
+        clamping_info = self.clamping_faces()
+        width_tolerance = 15.0  # mm - Allowable width diff to stay in same vice group
+
+        # 1. If width is common --> boost its score
+        print("\n--- CALCULATING GLOBAL SCORES (COMMONALITY BONUS) ---")
+        all_widths = []
+        for setup in clamping_info:
+            for pair in setup['face_pairs']:
+                all_widths.append(pair['clamping_width'])
+
+        for setup in clamping_info:
+            for pair in setup['face_pairs']:
+                # Count how many other setups have a similar width
+                common_count = sum(1 for w in all_widths if abs(w - pair['clamping_width']) <= width_tolerance)
+                pair['global_score'] = pair['stability_score'] + (common_count * 0.1)
+                print(f"  {pair['face_axis']}: Stab({pair['stability_score']:.3f}) + "
+                      f"Bonus({common_count * 0.1:.2f}) = Total({pair['global_score']:.3f})")
+
+        # 2. SELECT BEST PAIR PER SETUP --> choice based on Global Score
+        print("\n--- SELECTED BEST PAIR PER SETUP ---")
+        selected_setups = []
+        for setup in clamping_info:
+            if not setup['face_pairs']:
+                print(f"Setup {setup['setup_axis']}: SKIPPED (No valid pairs)")
+                continue
+            best_pair = max(setup['face_pairs'], key=lambda x: x['global_score'])
+            print(f"Setup {setup['setup_axis']}: Selected {best_pair['face_axis']} "
+                f"(Width: {best_pair['clamping_width']:.2f})")
+            selected_setups.append({
+                'setup_axis': setup['setup_axis'],
+                'data': best_pair
+            })
+
+        # 3. GROUP BY width
+        selected_setups.sort(key=lambda x: x['data']['clamping_width'])
+        vice_groups = []
+        for s in selected_setups:
+            assigned = False
+            for group in vice_groups:
+                # Check if width fits the group range
+                if abs(s['data']['clamping_width'] - np.mean(group['widths'])) <= width_tolerance:
+                    group['setups'].append(s['setup_axis'])
+                    group['widths'].append(s['data']['clamping_width'])
+                    group['h_mins'].append(s['data']['clamping_min_height'])
+                    group['lengths'].append(s['data']['clamping_max_length'])
+                    assigned = True
+                    break
+
+            if not assigned:
+                vice_groups.append({
+                    'setups': [s['setup_axis']],
+                    'widths': [s['data']['clamping_width']],
+                    'h_mins': [s['data']['clamping_min_height']],
+                    'lengths': [s['data']['clamping_max_length']]
+                })
+
+        # 4. FORMAT OUTPUT
+        print("\n" + "=" * 50)
+        print("FINAL WORKHOLDING SUGGESTION (VIRTUAL VICES)")
+        print("=" * 50)
+
+        final_suggestion = {}
+        for i, g in enumerate(vice_groups):
+            name = f"Virtual Vice {i + 1}"
+            envelope = {
+                'Associated Setups': g['setups'],
+                'Width Range (Part)': (round(min(g['widths']), 2), round(max(g['widths']), 2)),
+                'Required Opening (Min)': round(max(g['widths']), 2),
+                'Max Safe Jaw Height': round(min(g['h_mins']), 2),
+                'Min Required Jaw Width': round(max(g['lengths']), 2)
+            }
+            final_suggestion[name] = envelope
+
+            print(f"\n>>> {name}")
+            for k, v in envelope.items():
+                print(f"  {k}: {v}")
+
+        print("\n" + "=" * 50)
+        return final_suggestion
 
 
+    # helper visualization
     def visualize_common_area(self, axis1, axis2, common_points):
         import plotly.graph_objects as go
         import numpy as np
