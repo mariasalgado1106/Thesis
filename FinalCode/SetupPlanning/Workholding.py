@@ -110,7 +110,6 @@ class Workholding:
             stock_min_h = [self.xmax, self.ymax, self.zmax][idx_height]
         else:
             stock_min_h = [self.xmin, self.ymin, self.zmin][idx_height]
-        print(stock_min_h)
 
         step_size = 0.5
 
@@ -147,8 +146,6 @@ class Workholding:
         max_h = np.max(pts_arr[:, idx_height]) - stock_min_h
         # max_len is the total horizontal span
         max_len = np.max(pts_arr[:, idx_len]) - np.min(pts_arr[:, idx_len])
-
-        print(f"min height {h_min}")
 
         return max_len, h_min, max_h
 
@@ -197,7 +194,7 @@ class Workholding:
                             max_min_pts[fa1][1] - max_min_pts[fa1][0]))
 
                 print(f"  Pairs {fa1}/{fa2} -> Width: {clamping_width:.2f}, "
-                      f"Area: {common_area:.2f}, Stab: {stability_score:.4f}")
+                      f"Area: {common_area:.2f}, Max height: {h_min:.2f}")
 
                 clamping_pairs.append({
                     'face_axis': (fa1, fa2),
@@ -221,7 +218,6 @@ class Workholding:
         width_tolerance = 15.0  # mm - Allowable width diff to stay in same vice group
 
         # 1. If width is common --> boost its score
-        print("\n--- CALCULATING GLOBAL SCORES (COMMONALITY BONUS) ---")
         all_widths = []
         for setup in clamping_info:
             for pair in setup['face_pairs']:
@@ -232,8 +228,6 @@ class Workholding:
                 # Count how many other setups have a similar width
                 common_count = sum(1 for w in all_widths if abs(w - pair['clamping_width']) <= width_tolerance)
                 pair['global_score'] = pair['stability_score'] + (common_count * 0.1)
-                print(f"  {pair['face_axis']}: Stab({pair['stability_score']:.3f}) + "
-                      f"Bonus({common_count * 0.1:.2f}) = Total({pair['global_score']:.3f})")
 
         # 2. SELECT BEST PAIR PER SETUP --> choice based on Global Score
         print("\n--- SELECTED BEST PAIR PER SETUP ---")

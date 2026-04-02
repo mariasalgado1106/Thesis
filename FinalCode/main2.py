@@ -10,7 +10,7 @@ from SetupPlanning.Workholding import Workholding
 
 def main():
     # 1. Load STEP file
-    step_file = os.path.join("STEPFiles", "Part2.stp")
+    step_file = os.path.join("STEPFiles", "Part3.stp")
     my_shape = load_step_file(step_file)
     if not my_shape:
         print("Failed to load shape.")
@@ -19,7 +19,7 @@ def main():
     # 2. Feature Recognition & TAD Extraction
     print("\n" + "=" * 30 + "\nFEATURE RECOGNITION\n" + "=" * 30)
     recognizer = FeatureRecognition(my_shape)
-    features = recognizer.identify_features()
+    #features = recognizer.identify_features()
 
     extractor = TAD_Extraction(my_shape)
     extractor.print_tad_table()
@@ -30,6 +30,7 @@ def main():
     #optimized_plan = process_planner.generate_optimized_plan()
 
     workholding = Workholding(my_shape)
+    optimized_plan = workholding.optimized_plan
     workholding.final_clamping_suggestion()
 
     '''
