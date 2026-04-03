@@ -22,6 +22,18 @@ class Workholding:
         self.stock_faces = self.setup_plan.define_stock_faces_list()
         self.optimized_plan = self.setup_plan.generate_optimized_plan()
 
+    def vice_library (self):
+        vice1 = ({
+            'nr': 1,
+            'name': "f",
+            'clamping_height': 1,
+            'clamping_length': 1,
+            'clamping_width': 100
+        })
+
+        vices = [vice1,]
+        return vices
+
     # Helper functions
     def generate_grid (self, axis, step_size=0.5):
         axis_map = {'z': (0, 1, 2), '-z': (0, 1, 2),
@@ -59,9 +71,9 @@ class Workholding:
                     'y': (0, 2, 1), '-y': (0, 2, 1)}
         idx1, idx2, fixed_idx = axis_map[fa1]
         bounds = [(self.xmin, self.xmax), (self.ymin, self.ymax), (self.zmin, self.zmax)]
-        clamping_height = 5
+        clamping_height = 30
         dim1_range = np.arange(bounds[idx1][0], bounds[idx1][1], step_size)
-        dim2_range = np.arange(bounds[idx2][0], bounds[idx2][1], step_size)
+        dim2_range = np.arange(bounds[idx2][0], bounds[idx2][0] + clamping_height, step_size)
         faces1, faces2, grid_points = [], [], []
         for face in self.stock_faces:
             if face['opposite_TAD'] == fa1:
@@ -91,7 +103,7 @@ class Workholding:
         return grid_points, total_area
 
     def find_height_and_length (self, common_pts, setup, face_axis):
-        dual_axis_map = { #input (setup, face axis) -> output(lenghth and height)
+        dual_axis_map = { #input (setup, face axis) -> output(length and height)
             'z': {'x': (1, 2), '-x': (1, 2), 'y': (0, 2), '-y': (0, 2)},
             '-z': {'x': (1, 2), '-x': (1, 2), 'y': (0, 2), '-y': (0, 2)},
             'x': {'y': (2, 0), '-y': (2, 0), 'z': (1, 0), '-z': (1, 0)},
@@ -99,19 +111,18 @@ class Workholding:
             'y': {'x': (2, 1), '-x': (2, 1), 'z': (0, 1), '-z': (0, 1)},
             '-y': {'x': (2, 1), '-x': (2, 1), 'z': (0, 1), '-z': (0, 1)}
         }
+        step_size = 0.5
         if not common_pts:
             return 0, 0, 0
         idx_len, idx_height = dual_axis_map[setup][face_axis]
         pts_arr = np.array(common_pts)
 
-        # Define stock_min_h based on the current height index
+        # If positive setup -> the part is flipped
         is_positive_setup = ['x', 'y', 'z']
         if setup in is_positive_setup:
             stock_min_h = [self.xmax, self.ymax, self.zmax][idx_height]
         else:
             stock_min_h = [self.xmin, self.ymin, self.zmin][idx_height]
-
-        step_size = 0.5
 
         # 1. Group points by their "length" coordinate (columns)
         columns = {}
@@ -122,32 +133,32 @@ class Workholding:
             columns[l_coord].append(p[idx_height])
 
         # 2. For every column, find its "continuous height" from the bottom
-        column_heights = []
+        min_heights, max_heights = [], []
         for l_coord, heights in columns.items():
             if setup in is_positive_setup:
                 h_sorted = sorted(heights, reverse=True)
             else:
                 h_sorted = sorted(heights)
             h_limit = h_sorted[0]
+            max_heights.append(abs(round(stock_min_h - h_sorted[len(h_sorted)])))
 
             for i in range(1, len(h_sorted)):
                 if abs(h_sorted[i] - h_sorted[i - 1]) > (step_size * 1.1):
                     break
                 else:
                     h_limit = h_sorted[i]
-            column_heights.append(abs(round(stock_min_h - h_limit)))
+            min_heights.append(abs(round(stock_min_h - h_limit)))
             continue
 
+        # 3. H_min is the MINIMUM without intersecting any features
+        # h_max is the MINIMUM max height without intersecting tool (feats in that setup)
+        h_min = min(min_heights) if min_heights else 0
+        h_max = min(max_heights) if max_heights else 0
 
-        # 3. H_min is the MINIMUM of all those continuous columns
-        h_min = min(column_heights) if column_heights else 0
-
-        # max_h is the absolute highest point found anywhere in the grid
-        max_h = np.max(pts_arr[:, idx_height]) - stock_min_h
         # max_len is the total horizontal span
         max_len = np.max(pts_arr[:, idx_len]) - np.min(pts_arr[:, idx_len])
 
-        return max_len, h_min, max_h
+        return max_len, h_min, h_max
 
     # ACTUAL
     def clamping_faces (self):
@@ -167,45 +178,50 @@ class Workholding:
                 max_min_pts = {'x': (self.xmin, self.xmax),
                                'y': (self.ymin, self.ymax),
                                'z': (self.zmin, self.zmax)}
-                clamping_width = abs(max_min_pts[fa1][1] - max_min_pts[fa1][0])
-                idx_v = {'z': 2, '-z': 2, 'x': 0, '-x': 0, 'y': 1, '-y': 1}[setup_axis]
-                axis_letter = setup_axis.replace('-', '')
-                total_part_height = max_min_pts[axis_letter][1] - max_min_pts[axis_letter][0]
+                # Validate based on clamping area, define max height without interfering with a feature of setup,
+                # height of part if clamped in that way vs height of clamp (stability)
+                # stability score
+                # 1. Is there Clamping Area?
                 common_pts, common_area = self.common_parallel_area(fa1, fa2)
                 if not common_pts:
                     print(f"  Pairs {fa1}/{fa2}: No common area found.")
                     continue
-                max_len, h_min, clamping_top = self.find_height_and_length(common_pts, setup_axis, fa1)
-                # GAP AT BOTTOM
-                stock_min_h = max_min_pts[axis_letter][0]
-                min_h_in_grid = np.min(np.array(common_pts)[:, idx_v]) - stock_min_h
 
-                # --- LOCAL STABILITY SCORE ---
-                # Ratio of common area vs stock face area * contact length ratio
-                # Helps choose the best face pair for THIS setup
-                stock_area = abs(max_min_pts[pf1][1] - max_min_pts[pf1][0]) * \
-                             abs(max_min_pts[pf3][1] - max_min_pts[pf3][0])
-                # tipping risk-> If h_min is 5mm and total_part_height is 100mm, score is low
-                height_stability = h_min / (total_part_height + 1e-6)
-                # Penalty if we aren't clamping at the floor (min_h_in_grid > 0)
-                floor_penalty = 1.0 if min_h_in_grid < 0.6 else (0.5 / min_h_in_grid)
+                # 2. Clamping Width
+                clamping_width = abs(max_min_pts[fa1][1] - max_min_pts[fa1][0])
 
-                stability_score = (common_area / stock_area) * height_stability * floor_penalty* (max_len / (
-                            max_min_pts[fa1][1] - max_min_pts[fa1][0]))
+                # 3. Total Height of part vs Height of clamp
+                max_len, h_min, h_max = self.find_height_and_length(common_pts, setup_axis, fa1)
+                axis_letter = setup_axis.replace('-', '')
+                total_part_height = max_min_pts[axis_letter][1] - max_min_pts[axis_letter][0]
+                if h_max < 0.4 * total_part_height:  # 40% of total height
+                    continue
 
-                print(f"  Pairs {fa1}/{fa2} -> Width: {clamping_width:.2f}, "
-                      f"Area: {common_area:.2f}, Max height: {h_min:.2f}")
+                # 4. Validate length
+                len_axis = {  # input (setup, face axis) -> output(length and height)
+                    'z': {'x': (1), 'y': (0)},
+                    'x': {'y': (2), 'z': (1)},
+                    'y': {'x': (2), 'z': (0)},
+                }
+                idx_len = len_axis[axis_letter][fa1]
+                total_len = abs(max_min_pts[idx_len][1] - max_min_pts[idx_len][0])
+                if max_len < 0.5* total_len: continue
+
+                print(f"Pair of faces {fa1}/{fa2} sucessfully validated."
+                          f"-> Clamping Width: {clamping_width} mm."
+                          f"-> Max Heigth without intersecting features of this setup: {h_max} mm."
+                          f"-> Min Height without intersecting any feature's openings: {h_min} mm."
+                          f"-> Length of common area: {max_len} mm.")
 
                 clamping_pairs.append({
-                    'face_axis': (fa1, fa2),
-                    'common_pts': common_pts,
-                    'common_area': common_area,
-                    'clamping_width': clamping_width,
-                    'clamping_max_length': max_len,
-                    'clamping_min_height': h_min,
-                    'clamping_max_height': clamping_top,
-                    'stability_score': stability_score
-                })
+                        'face_axis': (fa1, fa2),
+                        'common_pts': common_pts,
+                        'common_area': common_area,
+                        'clamping_width': clamping_width,
+                        'clamping_max_length': max_len,
+                        'clamping_min_height': h_min,
+                        'clamping_max_height': h_max
+                    })
             clamping_faces_info.append({
                 'setup_axis': setup_axis,
                 'face_pairs': clamping_pairs
