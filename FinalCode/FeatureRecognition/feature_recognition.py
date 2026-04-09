@@ -188,7 +188,7 @@ class FeatureRecognition:
         self.lib = FeatureLibrary()
 
 
-        self.matches: List[Dict] = []
+        self.matches: List[Dict] = None
 
     # Free Form Pocket: 1 base node connected to n-1 nodes, that are all connected in a loop
     # all nodes are planes
@@ -321,7 +321,8 @@ class FeatureRecognition:
 
 
     def identify_features(self) -> List[Dict]:
-
+        if self.matches is not None:
+            return self.matches
         print(f"\n=== IDENTIFY FEATURES ===")
         print(f"Total connected components: {len(self.subgraphs_info)}")
         from networkx.algorithms import isomorphism
@@ -500,20 +501,6 @@ class FeatureRecognition:
 
             if not matched:
                 print(f"Candidate {candidate_idx} still unrecognized.")
-
-        '''print(f"\n=== FINAL RESULTS ===")
-        print("\n" + "=" * 60)
-        print(f"{'ID':<5} | {'Feature Type':<25} | {'Base Faces (TAD)':<15}")
-        print("-" * 60)
-
-        for m in self.matches:
-            # Format the list of faces as a string for cleaner printing
-            base_str = ", ".join(map(str, m['tad_faces'])) if m['tad_faces'] else "None"
-
-            print(f"{m['feat_idx']:<5} | {m['feature_type']:<25} | {base_str:<15}")
-
-        print("=" * 60 + "\n")'''
-
         return self.matches
 
     def visualize_features_3d(self, show_mesh=True, mesh_opacity=0.7,

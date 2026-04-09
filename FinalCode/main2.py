@@ -19,9 +19,9 @@ def main():
     # 2. Feature Recognition & TAD Extraction
     print("\n" + "=" * 30 + "\nFEATURE RECOGNITION\n" + "=" * 30)
     recognizer = FeatureRecognition(my_shape)
-    #features = recognizer.identify_features()
+    features = recognizer.identify_features()
 
-    extractor = TAD_Extraction(my_shape)
+    extractor = TAD_Extraction(my_shape, recognizer=recognizer)
     extractor.print_tad_table()
 
     # 3. Process Planning & Workholding Validation
@@ -29,7 +29,7 @@ def main():
     process_planner = Setup_Plan(my_shape)
     #optimized_plan = process_planner.generate_optimized_plan()
 
-    workholding = Workholding(my_shape)
+    workholding = Workholding(my_shape, recognizer)
     optimized_plan = workholding.optimized_plan
     workholding.final_clamping_suggestion()
 

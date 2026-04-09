@@ -14,17 +14,17 @@ from networkx.generators.harary_graph import hkn_harary_graph
 
 
 class Setup_Plan:
-    def __init__(self, my_shape):
+    def __init__(self, my_shape, recognizer=None):
         self.shape = my_shape
         (self.all_faces, self.face_data_list, self.analyser, self.all_edges,
          self.edge_data_list) = analyze_shape(self.shape)
 
-        self.recognizer = FeatureRecognition(self.shape)
+        self.recognizer = recognizer if recognizer else FeatureRecognition(self.shape)
         self.features = self.recognizer.identify_features()
         self.colors_rgb = self.recognizer.colors_rgb
 
-        self.tad_extractor = TAD_Extraction(self.shape)
-        self.dep_extractor = Dependencies(self.shape)
+        self.tad_extractor = TAD_Extraction(self.shape, recognizer=self.recognizer)
+        self.dep_extractor = Dependencies(self.shape, recognizer=self.recognizer)
         self.feature_info = self.dep_extractor.identify_relationships()
 
     #### Grouping ####
@@ -234,7 +234,6 @@ class Setup_Plan:
 
             if is_point_safe:
                 safe_points.append(p)
-        print(f"Safe points: {len(safe_points)}")
 
         return idx1, idx2, safe_points
 
@@ -391,7 +390,7 @@ class Setup_Plan:
                     'PLF_area': sf_area
                     })
                 PLF_total_area = PLF_total_area + sf_area
-                print(f"Face {stock_face['stock_face_idx']} is a candidate for PLF of Setup of TAD {axis}")
+                #print(f"Face {stock_face['stock_face_idx']} is a candidate for PLF of Setup of TAD {axis}")
             # 1.3. Determine possible SLFs
             elif sf_axis in perp_data:
                 perp_data[sf_axis]['faces'].append({
@@ -421,7 +420,6 @@ class Setup_Plan:
                     'Face_center': sf_center,
                     'TLF_area': sf_area
                 })
-                print(f"area of face {sf_idx} is {sf_area}")
                 perp_data2[sf_axis]['total_area'] += sf_area
         tlf_axis = max(perp_data2, key=lambda k: perp_data2[k]['total_area'])
         TLFs = perp_data2[tlf_axis]['faces']
@@ -433,7 +431,6 @@ class Setup_Plan:
         original_area = self.get_original_stock_area(axis)
         if original_area > 0:
             area_ratio = (PLF_total_area / original_area) * 100
-            # print(f"Total PLF Area: {PLF_total_area:.2f} / Original: {original_area:.2f} ({area_ratio:.1f}%)")
             if area_ratio < 30:
                 print(f"WARNING: Stability compromised! Only {area_ratio:.1f}% of the base remains.")
                 validated = False
@@ -474,8 +471,7 @@ class Setup_Plan:
                     'PLF_faces': PLFs,
                     'PLF_locators': PLF_locators
                 })
-                print(f"Primary Locators: {PLF_locators}")
-                print(f"CoG Balanced: {balanced}")
+                #print(f"Primary Locators: {PLF_locators} & CoG Balanced?: {balanced}")
 
         # 4.2. Find 2 locators in SLF
         if len(SLF_grid_pts) >= 2 and validated:
@@ -483,7 +479,7 @@ class Setup_Plan:
                 'SLF_faces': SLFs,
                 'SLF_locators': SLF_locators
             })
-            print(f"Secondary Locators: {SLF_locators}")
+            #print(f"Secondary Locators: {SLF_locators}")
 
         # 4.3. Find 1 locator in TLF
         if len(TLF_grid_pts) >= 1 and validated:
@@ -491,7 +487,7 @@ class Setup_Plan:
                 'TLF_faces': TLFs,
                 'TLF_locators': TLF_locators
             })
-            print(f"Terciary Locator: {TLF_locators}")
+            #print(f"Terciary Locator: {TLF_locators}")
 
 
         return PLF, SLF, TLF, validated
