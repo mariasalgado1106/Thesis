@@ -760,13 +760,13 @@ class Setup_Plan:
         )
         fig.show()
 
-    def visualize_all_setups_3d(self, optimized_plan):
+    def visualize_all_setups_3d(self, optimized_plan, show_edges=True):
         import plotly.graph_objects as go
         import numpy as np
 
         fig = go.Figure()
 
-        # 1. Part Body (Opacity 0.5)
+        # 1. Part Body
         all_vertices = []
         all_triangles = []
         vertex_offset = 0
@@ -785,9 +785,66 @@ class Setup_Plan:
             fig.add_trace(go.Mesh3d(
                 x=all_vertices[:, 0], y=all_vertices[:, 1], z=all_vertices[:, 2],
                 i=all_triangles[:, 0], j=all_triangles[:, 1], k=all_triangles[:, 2],
-                color='rgb(210, 210, 210)', opacity=0.5, name='Part Body',
+                color='rgb(210, 210, 210)', opacity=0.9, name='Part Body',
                 showlegend=True, hoverinfo='skip'
             ))
+
+        # 3. EDGES
+        if show_edges:
+            edge_groups = {
+                'Convex': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': (0.5, 0.5, 0.5),
+                    'width': 4
+                },
+                'Concave': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': (0.5, 0.5, 0.5),
+                    'width': 4
+                },
+                'Tangent': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': (0.5, 0.5, 0.5),
+                    'width': 3
+                },
+                'Unknown': {
+                    'x': [], 'y': [], 'z': [],
+                    'color': (0.5, 0.5, 0.5),
+                    'width': 2
+                }
+            }
+
+            for edge in self.edge_data_list:
+                # Type
+                etype = 'Unknown'
+                if edge.get('classification'):
+                    etype = edge['classification'][0]  # Take the first classification
+
+                # Geometry Points
+                points = edge.get('points', [])
+                if len(points) == 0:
+                    continue
+
+                group = edge_groups.get(etype, edge_groups['Unknown'])
+
+                group['x'].extend([p[0] for p in points] + [None])
+                group['y'].extend([p[1] for p in points] + [None])
+                group['z'].extend([p[2] for p in points] + [None])
+
+            for name, group in edge_groups.items():
+                if not group['x']:
+                    continue
+
+                r, g, b = group['color']
+                color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
+
+                fig.add_trace(go.Scatter3d(
+                    x=group['x'], y=group['y'], z=group['z'],
+                    mode='lines',
+                    line=dict(color=color_str, width=group['width']),
+                    name=f"{name} Edges",
+                    showlegend=True
+                ))
 
         # 2. Setup-specific Locators
         for idx, step in enumerate(optimized_plan):

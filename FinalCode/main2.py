@@ -24,6 +24,9 @@ def main():
     extractor = TAD_Extraction(my_shape, recognizer=recognizer)
     extractor.print_tad_table()
 
+    dependencies = Dependencies(my_shape, recognizer=recognizer)
+    dependencies.print_dependency_table()
+
     # 3. Process Planning & Workholding Validation
     print("\n" + "=" * 30 + "\nWORKHOLDING VALIDATION\n" + "=" * 30)
     process_planner = Setup_Plan(my_shape)

@@ -328,7 +328,7 @@ class Workholding:
                 'Associated Setups': g['setups'],
                 'Required Opening (Width)': round(max(g['widths']), 2),
                 'Max Allowable Jaw Height (Tool Safety)': round(min(g['h_maxes']), 2),
-                'Min Effective Grip Height (Feature Safety)': round(max(g['h_mins']), 2),
+                'Min Effective Grip Height (Feature Safety)': round(min(g['h_mins']), 2),
                 'Min Jaw Width (Length)': round(max(g['lengths']), 2)
             }
             final_suggestion[name] = envelope
