@@ -641,11 +641,6 @@ class AAGBuilder_2D:
             Line2D([0], [0], color=self.colors_rgb['edge_convex'], lw=2, label='Convex Edge'),
             Line2D([0], [0], color=self.colors_rgb['edge_concave'], lw=2, label='Concave Edge'),
             Line2D([0], [0], color=self.colors_rgb['edge_tangent'], lw=2, label='Tangent Edge'),
-            # Features
-            Patch(facecolor='none', edgecolor=self.colors_rgb['feat_hole_through'], linewidth=3, label='Through Hole'),
-            Patch(facecolor='none', edgecolor=self.colors_rgb['feat_hole_blind'], linewidth=3, label='Blind Hole'),
-            Patch(facecolor='none', edgecolor=self.colors_rgb['feat_pocket_through'], linewidth=3, label='Through Pocket'),
-            Patch(facecolor='none', edgecolor=self.colors_rgb['feat_pocket_blind'], linewidth=3, label='Blind Pocket')
         ]
         ax2.legend(handles=legend_elements, loc='upper left', fontsize=8, frameon=True)
 
