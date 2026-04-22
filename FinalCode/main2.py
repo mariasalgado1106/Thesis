@@ -34,7 +34,8 @@ def main():
 
     workholding = Workholding(my_shape, recognizer)
     optimized_plan = workholding.optimized_plan
-    workholding.final_clamping_suggestion()
+    workholding.clamping_faces()
+    #workholding.final_clamping_suggestion()
 
     '''
     # --- TEST 3-2-1 CONFIGURATION ---

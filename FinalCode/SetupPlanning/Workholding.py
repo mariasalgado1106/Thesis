@@ -86,7 +86,7 @@ class Workholding:
                         grid_points.append(tuple(res_pnt))
 
         total_area = len(grid_points) * (step_size ** 2)
-        print(f"Total Common Clamping Area: {total_area} mm²")
+        #print(f"Total Common Clamping Area: {total_area} mm²")
         return grid_points, total_area
 
     def find_height_and_length (self, common_pts, setup, face_axis):
@@ -149,11 +149,28 @@ class Workholding:
 
     # ACTUAL
     def clamping_faces (self):
+        vice_library = {
+            'width': 200,
+            'height': 50,
+            'length': 150
+        }
+
         perpendicular_axis = {'z': ('x', '-x', 'y', '-y'), '-z': ('x', '-x', 'y', '-y'),
                               'x': ('z', '-z', 'y', '-y'), '-x': ('z', '-z', 'y', '-y'),
                               'y': ('x', '-x', 'z', '-z'), '-y': ('x', '-x', 'z', '-z')}
         clamping_faces_info = []
-        print("\n--- ANALYZING CLAMPING OPTIONS PER SETUP ---")
+        table_data = []
+
+        # Header for the console table
+        print("\n" + "=" * 125)
+        print(
+            f"{'Setup':<8} | {'Pair':<10} | {'Width':<8} | {'Height':<8} | {'Length':<8} | {'H-Ratio':<8} | {'L-Ratio':<8} | {'Area-R':<8} | {'HangH-L':<8} | {'Status'}")
+        print("-" * 125)
+        # 1st Row: Library Vice Info
+        print(
+            f"{'LIB':<8} | {'N/A':<10} | {vice_library['width']:<8.2f} | {vice_library['height']:<8.2f} | {vice_library['length']:<8.2f} | {'1.00':<8} | {'1.00':<8} | {'1.00':<8} | REFERENCE")
+
+        #print("\n--- ANALYZING CLAMPING OPTIONS PER SETUP ---")
         for setup in self.optimized_plan:
             setup_axis = setup['setup']
             pf1,pf2,pf3,pf4 = perpendicular_axis[setup_axis]
@@ -162,7 +179,7 @@ class Workholding:
             print(f"\nSetup {setup_axis}:")
 
             for fa1,fa2 in pairs_parallel_faces: #fa = face axis
-                print(f"VALIDATING Pair {fa1}/{fa2}.")
+                #print(f"VALIDATING Pair {fa1}/{fa2}.")
                 max_min_pts = {'x': (self.xmin, self.xmax),
                                'y': (self.ymin, self.ymax),
                                'z': (self.zmin, self.zmax)}
@@ -182,9 +199,11 @@ class Workholding:
                 max_len, idx_len, h_min, h_max, idx_height = self.find_height_and_length(common_pts, setup_axis, fa1)
                 axis_letter = setup_axis.replace('-', '')
                 total_part_height = max_min_pts[axis_letter][1] - max_min_pts[axis_letter][0]
+                h_ratio = h_max/ total_part_height
+                '''
                 if h_max < 0.4 * total_part_height:  # 40% of total height
                     print(f"Max height of clamping: {h_max},  too small for total height of {total_part_height}.")
-                    continue
+                    continue'''
 
                 # 4. Validate length
                 len_axis = {  # input (setup, face axis) -> output(length and height)
@@ -194,53 +213,68 @@ class Workholding:
                 }
                 idx_len = len_axis[axis_letter][fa1]
                 total_len = abs(max_min_pts[idx_len][1] - max_min_pts[idx_len][0])
+                len_ratio = max_len/total_len
+                hanging_height = total_part_height - min(h_max, vice_library['height'])
+                hanging_height_length_ratio = (hanging_height)/total_len
+                '''
                 if max_len < 0.5* total_len:
                     print(f"Max length of clamping {max_len} too small.")
-                    continue
+                    continue'''
+
 
                 # 5. Contact area validation
+                h_filt = min(h_max, vice_library['height'])
                 is_pos = setup_axis in ['x', 'y', 'z']
                 ref_floor = max_min_pts[setup_axis.replace('-', '')][1 if is_pos else 0]
                 if is_pos:# If setup is +X, height goes "down" from Xmax
-                    filtered_pts = [p for p in common_pts if abs(p[idx_height] - ref_floor) <= h_max]
+                    filtered_pts = [p for p in common_pts if abs(p[idx_height] - ref_floor) <= h_filt]
                 else:# If setup is -X, height goes "up" from Xmin
-                    filtered_pts = [p for p in common_pts if abs(p[idx_height] - ref_floor) <= h_max]
+                    filtered_pts = [p for p in common_pts if abs(p[idx_height] - ref_floor) <= h_filt]
                 common_area_filt = len(filtered_pts) * (0.5 ** 2) #0.5 is step size
-                theoretical_jaw_area = max_len * h_max
-                contact_ratio = common_area / (theoretical_jaw_area + 1e-6)
+                theoretical_jaw_area = max_len * h_filt
+                contact_area_ratio = common_area_filt / (theoretical_jaw_area)
 
-                if contact_ratio < 0.4:  # Require at least 40% contact in the grip zone
-                    print(f"Contact ratio {contact_ratio:.2f} too low.")
-                    continue
 
-                # 6. Stability Score: Favor larger area, larger height coverage, and wider contact
-                stability_score = (common_area) * (h_max / total_part_height) * (max_len)
 
-                print(f"Pair of faces {fa1}/{fa2} sucessfully validated.")
+                '''
+                if contact_area_ratio < 0.4:  # Require at least 40% contact in the grip zone
+                    print(f"Contact ratio {contact_area_ratio:.2f} too low.")
+                    continue'''
+
+                # 6. Flagging Logic
+                # Criteria: H >= 1/3 (0.33), Len >= 2/3 (0.66), Area >= 2/3 (0.66)
+                is_valid = h_ratio >= 0.33 and len_ratio >= 0.66 and contact_area_ratio >= 0.66 and hanging_height_length_ratio <=3
+                status = "PASS" if is_valid else "FAIL"
+
+                '''print(f"Pair of faces {fa1}/{fa2} sucessfully validated.")
                 print(f"-> Clamping Width: {clamping_width} mm.")
                 print(f"-> Max Heigth without intersecting features of this setup: {h_max} mm.")
                 print(f"-> Min Height without intersecting any feature's openings: {h_min} mm.")
                 print(f"-> Length of common area: {max_len} mm.")
-                print(f"-> Stability score: {stability_score}.")
+                print(f"-> Stability score: {stability_score}.")'''
+                # Print Row
+                pair_str = f"{fa1}/{fa2}"
+                print(
+                    f"{setup_axis:<8} | {pair_str:<10} | {clamping_width:<8.2f} | {h_max:<8.2f} | {max_len:<8.2f} | {h_ratio:<8.2f} | {len_ratio:<8.2f} | {contact_area_ratio:<8.2f} | {hanging_height_length_ratio:<8.2f} | {status}")
 
                 clamping_pairs.append({
-                        'face_axis': (fa1, fa2),
-                        'common_pts': common_pts,
-                        'common_area': common_area,
-                        'clamping_width': clamping_width,
-                        'clamping_max_length': max_len,
-                        'clamping_min_height': h_min,
-                        'clamping_max_height': h_max,
-                        'stability_score': stability_score
-                    })
+                    'face_axis': (fa1, fa2),
+                    'clamping_width': clamping_width,
+                    'h_ratio': h_ratio,
+                    'len_ratio': len_ratio,
+                    'contact_area_ratio': contact_area_ratio,
+                    'hanging_height_length_ratio': hanging_height_length_ratio,
+                    'status': status,
+                    'stability_score': (common_area) * h_ratio * max_len
+                })
             clamping_faces_info.append({
                 'setup_axis': setup_axis,
                 'face_pairs': clamping_pairs
             })
-
+        print("=" * 125 + "\n")
         return clamping_faces_info
 
-    def final_clamping_suggestion(self):
+    '''def final_clamping_suggestion(self):
         clamping_info = self.clamping_faces()
         width_tolerance = 15.0  # mm
 
@@ -338,7 +372,7 @@ class Workholding:
                 print(f"  {k}: {v}")
 
         return final_suggestion
-
+    '''
 
     # helper visualization
     def visualize_common_area(self, axis1, axis2, common_points):

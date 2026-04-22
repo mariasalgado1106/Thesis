@@ -28,41 +28,6 @@ from FeatureRecognition.geometry_analysis import load_step_file, analyze_shape
 
 
 
-'''
-#I ONLY NEED THIS IF I GET FROM OUTSIDE FILES, WHICH IM NOT USING
-def edge_key(edge, tolerance=1e-6):
-    try:
-        curve_adapter = BRepAdaptor_Curve(edge)
-        curve_type = curve_adapter.GetType()
-
-        if curve_type == GeomAbs_Circle:
-            circle = curve_adapter.Circle()
-            center = circle.Location()
-            radius = circle.Radius()
-            center_key = (
-                round(center.X() / tolerance) * tolerance,
-                round(center.Y() / tolerance) * tolerance,
-                round(center.Z() / tolerance) * tolerance,
-                round(radius / tolerance) * tolerance
-            )
-            return ("circle",) + center_key
-        else:
-            vertices = list(TopologyExplorer(edge).vertices())
-            if len(vertices) != 2:
-                return None
-            p1 = BRep_Tool.Pnt(vertices[0])
-            p2 = BRep_Tool.Pnt(vertices[1])
-            coords = sorted([
-                (round(p1.X() / tolerance) * tolerance, round(p1.Y() / tolerance) * tolerance,
-                 round(p1.Z() / tolerance) * tolerance),
-                (round(p2.X() / tolerance) * tolerance, round(p2.Y() / tolerance) * tolerance,
-                 round(p2.Z() / tolerance) * tolerance)
-            ])
-            return ("line",) + tuple(coords[0] + coords[1])
-    except:
-        return None
-'''
-
 #generate a triangulated mesh of the part for Plotly visualization
 def mesh_shape_for_visualization(shape, linear_deflection=0.1):
     BRepMesh_IncrementalMesh(shape, linear_deflection)
