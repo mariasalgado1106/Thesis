@@ -721,7 +721,7 @@ class FeatureRecognition:
                 },
                 'Tangent': {
                     'x': [], 'y': [], 'z': [],
-                    'color': self.colors_rgb.get('edge_tangent', (0, 1, 0)),  # Green
+                    'color': (0.5, 0.5, 0.5), #self.colors_rgb.get('edge_tangent', (0, 1, 0)),  # Green
                     'width': 3
                 },
                 'Unknown': {
@@ -733,7 +733,7 @@ class FeatureRecognition:
 
             for edge in self.edge_data_list:
                 # Type
-                etype = 'Unknown'
+                etype = 'Tangent'
                 if edge.get('classification'):
                     etype = edge['classification'][0]  # Take the first classification
 

@@ -248,7 +248,7 @@ class AAGBuilder_3D:
                 'edges': [],
                 'color': (0.5, 0.5, 0.5),  # grey
                 'width': 2,
-                'name': 'Unknown edges'
+                'name': 'Tangent edges'
             }
         }
 
@@ -605,7 +605,7 @@ class AAGBuilder_2D:
             # Edge types
             Line2D([0], [0], color=self.colors_rgb['edge_convex'], lw=2, label='Convex Edge'),
             Line2D([0], [0], color=self.colors_rgb['edge_concave'], lw=2, label='Concave Edge'),
-            Line2D([0], [0], color=self.colors_rgb['edge_tangent'], lw=2, label='Tangent Edge'),
+            #Line2D([0], [0], color=self.colors_rgb['edge_tangent'], lw=2, label='Tangent Edge'),
         ]
         ax2.legend(handles=legend_elements, loc='upper left', fontsize=8, frameon=True)
 

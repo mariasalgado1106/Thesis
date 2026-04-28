@@ -110,7 +110,7 @@ class Part_Visualizer:
                         "width": 4},
             "Tangent": {"xs": [], "ys": [], "zs": [], "name": "Tangent edges", "color": self.colors_rgb["edge_tangent"],
                         "width": 3},
-            "Unknown": {"xs": [], "ys": [], "zs": [], "name": "Unknown edges", "color": (0.5, 0.5, 0.5), "width": 2},
+            "Unknown": {"xs": [], "ys": [], "zs": [], "name": "Tangent edges", "color": (0.5, 0.5, 0.5), "width": 2},
         }
 
         for e in self.edge_data_list:

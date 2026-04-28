@@ -274,105 +274,7 @@ class Workholding:
         print("=" * 125 + "\n")
         return clamping_faces_info
 
-    '''def final_clamping_suggestion(self):
-        clamping_info = self.clamping_faces()
-        width_tolerance = 15.0  # mm
 
-        # 1. Collect ALL possible pairs from ALL setups into one list
-        all_possible_pairs = []
-        for setup in clamping_info:
-            for pair in setup['face_pairs']:
-                pair['parent_setup'] = setup['setup_axis']
-                all_possible_pairs.append(pair)
-
-        # 2. Cluster widths -> find a width that satisfies the maximum number of setups
-        all_possible_pairs.sort(key=lambda x: x['clamping_width'])
-
-        potential_groups = []
-        for p in all_possible_pairs:
-            assigned = False
-            for group in potential_groups:
-                if abs(p['clamping_width'] - np.mean(group['widths'])) <= width_tolerance:
-                    group['pairs'].append(p)
-                    group['widths'].append(p['clamping_width'])
-                    group['unique_setups'].add(p['parent_setup'])
-                    assigned = True
-                    break
-            if not assigned:
-                potential_groups.append({
-                    'pairs': [p],
-                    'widths': [p['clamping_width']],
-                    'unique_setups': {p['parent_setup']}
-                })
-
-        # Sort by how many unique setups they cover (Descending)-> prioritizes the "Universal Vice"
-        potential_groups.sort(key=lambda x: len(x['unique_setups']), reverse=True)
-
-        # 3. ASSIGN SETUPS TO GROUPS
-        selected_setups_map = {}  # setup_axis -> best pair within the best group
-        remaining_setups = set(s['setup_axis'] for s in clamping_info)
-        final_groups_data = []
-
-        for group in potential_groups:
-            # If this group contains setups we haven't satisfied yet
-            setups_in_group = group['unique_setups'].intersection(remaining_setups)
-
-            if setups_in_group:
-                group_setups_indices = []
-                group_widths = []
-                group_h_maxes = []
-                group_h_mins = []
-                group_lengths = []
-
-                for s_axis in list(setups_in_group):
-                    # Pick the best pair within THIS width group for this setup
-                    pairs_for_this_setup = [p for p in group['pairs'] if p['parent_setup'] == s_axis]
-                    best_pair_in_group = max(pairs_for_this_setup, key=lambda x: x['stability_score'])
-
-                    # Log data for the final envelope
-                    group_setups_indices.append(s_axis)
-                    group_widths.append(best_pair_in_group['clamping_width'])
-                    group_h_maxes.append(best_pair_in_group['clamping_max_height'])
-                    group_h_mins.append(best_pair_in_group['clamping_min_height'])
-                    group_lengths.append(best_pair_in_group['clamping_max_length'])
-
-                    remaining_setups.remove(s_axis)
-
-                    f1, f2 = best_pair_in_group['face_axis']
-                    print(
-                        f"Group Assignment: Setup {s_axis} assigned to width ~{np.mean(group['widths']):.1f} using {f1}/{f2}")
-
-                final_groups_data.append({
-                    'setups': group_setups_indices,
-                    'widths': group_widths,
-                    'h_maxes': group_h_maxes,
-                    'h_mins': group_h_mins,
-                    'lengths': group_lengths
-                })
-
-        # 4. FORMAT OUTPUT
-        print("\n" + "=" * 50)
-        print("MINIMIZED WORKHOLDING SUGGESTION (VIRTUAL VICES)")
-        print("=" * 50)
-
-        final_suggestion = {}
-        for i, g in enumerate(final_groups_data):
-            name = f"Virtual Vice {i + 1}"
-            envelope = {
-                'Associated Setups': g['setups'],
-                'Required Opening (Width)': round(max(g['widths']), 2),
-                'Max Allowable Jaw Height (Tool Safety)': round(min(g['h_maxes']), 2),
-                'Min Effective Grip Height (Feature Safety)': round(min(g['h_mins']), 2),
-                'Min Jaw Width (Length)': round(max(g['lengths']), 2)
-            }
-            final_suggestion[name] = envelope
-
-            print(f"\n>>> {name}")
-            for k, v in envelope.items():
-                print(f"  {k}: {v}")
-
-        return final_suggestion
-    '''
 
     # helper visualization
     def visualize_common_area(self, axis1, axis2, common_points):
@@ -420,4 +322,103 @@ class Workholding:
         )
         fig.show()
 
+    '''def final_clamping_suggestion(self):
+            clamping_info = self.clamping_faces()
+            width_tolerance = 15.0  # mm
+
+            # 1. Collect ALL possible pairs from ALL setups into one list
+            all_possible_pairs = []
+            for setup in clamping_info:
+                for pair in setup['face_pairs']:
+                    pair['parent_setup'] = setup['setup_axis']
+                    all_possible_pairs.append(pair)
+
+            # 2. Cluster widths -> find a width that satisfies the maximum number of setups
+            all_possible_pairs.sort(key=lambda x: x['clamping_width'])
+
+            potential_groups = []
+            for p in all_possible_pairs:
+                assigned = False
+                for group in potential_groups:
+                    if abs(p['clamping_width'] - np.mean(group['widths'])) <= width_tolerance:
+                        group['pairs'].append(p)
+                        group['widths'].append(p['clamping_width'])
+                        group['unique_setups'].add(p['parent_setup'])
+                        assigned = True
+                        break
+                if not assigned:
+                    potential_groups.append({
+                        'pairs': [p],
+                        'widths': [p['clamping_width']],
+                        'unique_setups': {p['parent_setup']}
+                    })
+
+            # Sort by how many unique setups they cover (Descending)-> prioritizes the "Universal Vice"
+            potential_groups.sort(key=lambda x: len(x['unique_setups']), reverse=True)
+
+            # 3. ASSIGN SETUPS TO GROUPS
+            selected_setups_map = {}  # setup_axis -> best pair within the best group
+            remaining_setups = set(s['setup_axis'] for s in clamping_info)
+            final_groups_data = []
+
+            for group in potential_groups:
+                # If this group contains setups we haven't satisfied yet
+                setups_in_group = group['unique_setups'].intersection(remaining_setups)
+
+                if setups_in_group:
+                    group_setups_indices = []
+                    group_widths = []
+                    group_h_maxes = []
+                    group_h_mins = []
+                    group_lengths = []
+
+                    for s_axis in list(setups_in_group):
+                        # Pick the best pair within THIS width group for this setup
+                        pairs_for_this_setup = [p for p in group['pairs'] if p['parent_setup'] == s_axis]
+                        best_pair_in_group = max(pairs_for_this_setup, key=lambda x: x['stability_score'])
+
+                        # Log data for the final envelope
+                        group_setups_indices.append(s_axis)
+                        group_widths.append(best_pair_in_group['clamping_width'])
+                        group_h_maxes.append(best_pair_in_group['clamping_max_height'])
+                        group_h_mins.append(best_pair_in_group['clamping_min_height'])
+                        group_lengths.append(best_pair_in_group['clamping_max_length'])
+
+                        remaining_setups.remove(s_axis)
+
+                        f1, f2 = best_pair_in_group['face_axis']
+                        print(
+                            f"Group Assignment: Setup {s_axis} assigned to width ~{np.mean(group['widths']):.1f} using {f1}/{f2}")
+
+                    final_groups_data.append({
+                        'setups': group_setups_indices,
+                        'widths': group_widths,
+                        'h_maxes': group_h_maxes,
+                        'h_mins': group_h_mins,
+                        'lengths': group_lengths
+                    })
+
+            # 4. FORMAT OUTPUT
+            print("\n" + "=" * 50)
+            print("MINIMIZED WORKHOLDING SUGGESTION (VIRTUAL VICES)")
+            print("=" * 50)
+
+            final_suggestion = {}
+            for i, g in enumerate(final_groups_data):
+                name = f"Virtual Vice {i + 1}"
+                envelope = {
+                    'Associated Setups': g['setups'],
+                    'Required Opening (Width)': round(max(g['widths']), 2),
+                    'Max Allowable Jaw Height (Tool Safety)': round(min(g['h_maxes']), 2),
+                    'Min Effective Grip Height (Feature Safety)': round(min(g['h_mins']), 2),
+                    'Min Jaw Width (Length)': round(max(g['lengths']), 2)
+                }
+                final_suggestion[name] = envelope
+
+                print(f"\n>>> {name}")
+                for k, v in envelope.items():
+                    print(f"  {k}: {v}")
+
+            return final_suggestion
+        '''
 
