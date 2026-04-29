@@ -414,7 +414,6 @@ class AAGBuilder_2D:
 
         return self.G
 
-
     def build_aag_subgraph (self):
         if self.G is None:
             self.build_aag_graph()
@@ -594,9 +593,7 @@ class AAGBuilder_2D:
         nx.draw_networkx(self.subG, pos=nodes_positions, with_labels=True,
             node_color=node_colors_subG, edge_color=edge_colors_subG, ax=ax2)
 
-        '''#4: Features (borders of subgraphs)'''
-
-        # 5: LEGEND
+        # 4: LEGEND
         legend_elements = [
             # Geometry
             Patch(facecolor=self.colors_rgb['geo_plane'], edgecolor='k', label='Plane'),
@@ -613,5 +610,4 @@ class AAGBuilder_2D:
             ax.axis('off')
         plt.tight_layout()
         plt.show()
-
 

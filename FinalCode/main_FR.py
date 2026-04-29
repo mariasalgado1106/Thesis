@@ -50,8 +50,9 @@ def main():
         "(3) Both, "
         "(4) 2D AAG + Subgraphs, "
         "(5) 3D AAG, "
-        "(6) 3D AAG without convex edges "
-        "[0/1/2/3/4/5/6]: "
+        "(6) 3D AAG without convex edges, "
+        "(7) Only Conjoined Pockets (2D AAG) "
+        "[0-7]: "
     )
 
     viz_occ = PartVisualizer_occ(builder2D, recognizer)
@@ -87,6 +88,10 @@ def main():
 
     if choice == "6":
         builder3D.visualize_3d_aag(hide_convex=True)
+
+    if choice == "7":
+        recognizer.identify_features()
+        recognizer.visualize_conjoined_pockets_2d()
 
     start_display()
 

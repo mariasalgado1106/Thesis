@@ -6,6 +6,11 @@ from FeatureRecognition.geometry_analysis import load_step_file, analyze_shape
 from FeatureRecognition.part_vizualizer_plotly import Part_Visualizer
 from networkx.generators.harary_graph import hkn_harary_graph
 
+import matplotlib.pyplot as plt
+import networkx as nx
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
+
 
 class FeatureLibrary:
     def __init__(self):
@@ -813,4 +818,60 @@ class FeatureRecognition:
             return dx * dz
 
         return 0
+
+    #vizualization
+    def visualize_conjoined_pockets_2d(self):
+        # 1. Filter for conjoined pockets only
+        # Based on your PASS 2 prints, we look for 'feat_pocket_blind' or 'feat_pocket_through'
+        # that came from the candidate_candidates_2 logic.
+        # For simplicity, we filter the matches list.
+        conjoined_matches = [f for f in self.matches if "pocket" in f['feature_type'].lower()]
+
+        if not conjoined_matches:
+            print("No conjoined pockets detected to visualize.")
+            return
+
+        # Use the global graph from the builder
+        G = self.aag.G
+
+        # Create a subplot for each conjoined pocket found
+        num_pockets = len(conjoined_matches)
+        fig, axes = plt.subplots(1, num_pockets, figsize=(8 * num_pockets, 7), squeeze=False)
+
+        for i, feature in enumerate(conjoined_matches):
+            nodes = feature['node_indices']
+            # Create a subgraph for this specific feature
+            subG = G.subgraph(nodes)
+            ax = axes[0, i]
+
+            pos = nx.spring_layout(subG, seed=42)
+
+            # Node Colors
+            node_colors = []
+            for n in subG.nodes:
+                face_type = subG.nodes[n].get('face_type', 'Other')
+                node_colors.append(self.colors_rgb.get(f'geo_{face_type.lower()}', self.colors_rgb['geo_other']))
+
+            # Edge Colors
+            edge_colors = []
+            for u, v, d in subG.edges(data=True):
+                e_type = d.get('edge_type', 'other')
+                edge_colors.append(self.colors_rgb.get(f'edge_{e_type}', (0.5, 0.5, 0.5)))
+
+            nx.draw_networkx(subG, pos=pos, ax=ax, with_labels=True,
+                             node_color=node_colors, edge_color=edge_colors, node_size=800)
+
+            ax.set_title(f"Feature {feature['feat_idx']}: {feature['feature_type']}\nNodes: {nodes}")
+            ax.axis('off')
+
+        # Add Legend (Reuse your existing legend logic)
+        legend_elements = [
+            Patch(facecolor=self.colors_rgb['geo_plane'], edgecolor='k', label='Plane'),
+            Patch(facecolor=self.colors_rgb['geo_cylinder'], edgecolor='k', label='Cylinder'),
+            Line2D([0], [0], color=self.colors_rgb['edge_convex'], lw=2, label='Convex Edge'),
+            Line2D([0], [0], color=self.colors_rgb['edge_concave'], lw=2, label='Concave Edge'),
+        ]
+        plt.legend(handles=legend_elements, loc='lower right')
+        plt.tight_layout()
+        plt.show()
 
