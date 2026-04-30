@@ -32,8 +32,6 @@ from OCC.Core.BRep import BRep_Tool
 
 from OCC.Core.gp import gp_Dir
 
-
-
 def load_step_file(step_file):
     if not os.path.exists(step_file):
         print("ERROR: NO STEP FILE")
@@ -41,15 +39,14 @@ def load_step_file(step_file):
 
     reader_occ = STEPControl_Reader() #translate step file info to smth readable by OCC
 
-    if reader_occ.ReadFile(step_file) == IFSelect_RetDone: #reads file --> success or failure
+    if reader_occ.ReadFile(step_file) == IFSelect_RetDone:
         print("STEP file read successfully!")
-        reader_occ.TransferRoots() #step data --> occ internal representation
+        reader_occ.TransferRoots() #step data -> occ internal representation
         shape = reader_occ.OneShape() #shape with all geometry
         return shape
     else:
         print("ERROR: Could not read STEP file.")
         return None
-
 
 def get_stock_box(shape, tol=1e-6):
     bbox = Bnd_Box()
@@ -78,7 +75,6 @@ def define_stock_face(face_data, xmin, ymin, zmin, xmax, ymax, zmax, tol=0.1):
         return "No"
 
     # Rule 2: It must have NO concave neighbors
-    # (Stock faces are the "outermost" shell; concave edges imply an internal feature)
     if len(face_data['concave_adjacent']) > 0:
         return "No"
 
@@ -191,16 +187,12 @@ def get_adjacent_faces(shape, target_face):
 
 def triangulate_face(face, linear_deflection=0.1):
     #Triangulate a face and return vertices and triangles
-
     location = TopLoc_Location()
     triangulation = BRep_Tool.Triangulation(face, location)
-
     if triangulation is None:
         return [], []
-
     transformation = location.Transformation()
 
-    # vertices
     vertices = []
     for i in range(1, triangulation.NbNodes() + 1):
         pnt = triangulation.Node(i)
@@ -218,8 +210,6 @@ def triangulate_face(face, linear_deflection=0.1):
 
 def triangulate_shape(shape, linear_deflection=0.1):
     #Triangulate the entire shape before extracting face meshes
-    #Call this once at the beginning
-
     mesher = BRepMesh_IncrementalMesh(shape, linear_deflection)
     mesher.Perform()
     if not mesher.IsDone():
@@ -279,9 +269,8 @@ def get_edge_info(edge):
     return edge_geom, edge_length, points
 
 
-
 def analyze_shape(my_shape):
-    # First, triangulate the entire shape
+    # Start by triangulating the entire shape
     linear_deflection = 0.1
     triangulate_shape(my_shape, linear_deflection)
     analyser = BRepOffset_Analyse(my_shape, 0.01) #make sre it considers right normals
@@ -326,7 +315,6 @@ def analyze_shape(my_shape):
             "mesh_triangles": triangles
         })
 
-
     # Second pass: adjacency
     for face_data in face_data_list:
         adjacent_faces = get_adjacent_faces(my_shape, face_data["face"])
@@ -334,7 +322,6 @@ def analyze_shape(my_shape):
         face_data["adjacent_indices"] = adj_indices
 
     # Third pass: Edge extraction + deduplication
-
     all_edges_raw = []  # store raw edges as given by OCC
     edge_explorer = TopExp_Explorer(my_shape, TopAbs_EDGE)
     while edge_explorer.More():
@@ -360,7 +347,6 @@ def analyze_shape(my_shape):
 
     # Use deduplicated edges from now on
     all_edges = unique_edges  # replace raw list with deduped list
-
     # Build edge index map for unique edges
     edge_to_index_map = {edge: i for i, edge in enumerate(all_edges)}
     edge_data_list = []
@@ -377,20 +363,17 @@ def analyze_shape(my_shape):
             "classification": []
         })
 
-
     # Classify edges per face adjacency
     for face_data in face_data_list:
         face = face_data['face']
         edges_of_face = t.edges_from_face(face)
-
         for edge in edges_of_face:
-            # Match the face-local edge handle to our unique edge list using IsSame()
+            # Match the face-local edge handle to our unique edge list
             matched_index = None  # index in all_edges corresponding to this edge
             for unique_edge in all_edges:
                 if edge.IsSame(unique_edge):
                     matched_index = edge_to_index_map[unique_edge]
                     break
-
             if matched_index is None:
                 # skip if no matching unique edge found
                 continue
@@ -437,8 +420,7 @@ def print_face_analysis_table(all_faces, face_data_list):
 
     print("\n--- Model Face Analysis Table ---")
     print(f"Total faces found: {len(all_faces)}")
-    print("-" * 140) # Increased width for new column
-    # Added 'Center (X, Y, Z)' column
+    print("-" * 140)
     print(f"{'Face #':<6} | {'Type':<10} | {'Stock':<6} | {'Dir/Axis':<8} | {'Area':<8} | {'Center (X, Y, Z)':<25} | {'Concave':<15} | {'Adjacent'}")
     print("-" * 140)
 
@@ -456,7 +438,7 @@ def print_face_analysis_table(all_faces, face_data_list):
               f"{face_data['type']:<10} | "
               f"{face_data['stock_face']:<6} | "
               f"{display_axis:<8} | "
-              f"{face_data['face_area']:<8.2f} | " # Added .2f for cleaner area values
+              f"{face_data['face_area']:<8.2f} | " 
               f"{center_str:<25} | "
               f"{str(face_data['concave_adjacent']):<15} | "
               f"{str(face_data['adjacent_indices'])}")

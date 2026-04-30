@@ -5,12 +5,10 @@ from FeatureRecognition.aag_builder import AAGBuilder_2D, AAGBuilder_3D
 from FeatureRecognition.geometry_analysis import load_step_file, analyze_shape
 from FeatureRecognition.part_vizualizer_plotly import Part_Visualizer
 from networkx.generators.harary_graph import hkn_harary_graph
-
 import matplotlib.pyplot as plt
 import networkx as nx
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
-
 
 class FeatureLibrary:
     def __init__(self):
@@ -175,9 +173,8 @@ class FeatureLibrary:
         self.features['feat_step_through'] = G_step_through
 
     def get(self, name: str) -> nx.Graph:
-        """Return a copy of the pattern graph so you don't mutate the library."""
+        #Return a copy of the pattern graph so you don't mutate the library
         return self.features[name].copy()
-
 
 class FeatureRecognition:
     def __init__(self, my_shape):
@@ -192,16 +189,14 @@ class FeatureRecognition:
         # library
         self.lib = FeatureLibrary()
 
-
         self.matches: List[Dict] = None
 
-    # Free Form Pocket: 1 base node connected to n-1 nodes, that are all connected in a loop
-    # all nodes are planes
     def build_free_form_pocket(self, n):
+        # Free Form Pocket: 1 base node connected to n-1 nodes, that are all connected in a loop
+        # all nodes are planes
         if n < 3:
             # Return empty graphs so nx.is_isomorphic will naturally fail
             return nx.Graph(), nx.Graph(), nx.Graph()
-
         #BLIND
         G_pocket_freeform_blind = nx.Graph()
         # base node
@@ -211,11 +206,9 @@ class FeatureRecognition:
             G_pocket_freeform_blind.add_node(i, face_type='Plane', geometry='Plane', stock_face='No', role='wall')
             # Every wall connects to the base
             G_pocket_freeform_blind.add_edge(0, i, edge_type='concave')
-
             # Connect to the previous wall
             if i > 1:
                 G_pocket_freeform_blind.add_edge(i, i - 1, edge_type='concave')
-
         # last wall must connect back to the first wall (node 1)
         if n > 2:
             G_pocket_freeform_blind.add_edge(n - 1, 1, edge_type='concave')
@@ -240,14 +233,12 @@ class FeatureRecognition:
                 G_pocket_other_freeform_through.add_edge(i, i - 1, edge_type='concave')
             #last wall doesnt connect with 1st
 
-
         return G_pocket_freeform_blind, G_pocket_freeform_through, G_pocket_other_freeform_through
 
-    # Conjoined Pockets: 1 base node connected to n-1 nodes, that are all connected in a loop
-    # (concave & convex)
-    # all nodes are planes
-
     def is_conjoined_pocket(self, candidate_graph, candidate_nodes):
+        # Conjoined Pockets: 1 base node connected to n-1 nodes, that are all connected in a loop
+        # (concave & convex)
+        # all nodes are planes
         n = len(candidate_nodes)
         if n < 5: return False, 0, 0
 
@@ -263,7 +254,6 @@ class FeatureRecognition:
         # We solve for 'p' (nr of pockets): p = 2(n-1) - Edges
         num_edges = candidate_graph.number_of_edges()
         p = (2 * (n - 1)) - num_edges
-
         # If p > 1, it's likely a conjoined pocket
         if p >= 2:
             return True, p, base_node
@@ -305,9 +295,9 @@ class FeatureRecognition:
 
         return G_conjoined_pocket_blind, G_conjoined_pocket_through
 
-    # Free Form Slot: 1 base node connected to n-1 nodes
-    # all nodes are planes
     def build_free_form_slot(self, n):
+        # Free Form Slot: 1 base node connected to n-1 nodes
+        # all nodes are planes
         # THROUGH
         G_slot_freeform_through = nx.Graph()
         # base node
@@ -322,8 +312,6 @@ class FeatureRecognition:
                 G_slot_freeform_through.add_edge(0, i, edge_type='concave')
 
         return G_slot_freeform_through
-
-
 
     def identify_features(self) -> List[Dict]:
         if self.matches is not None:
@@ -455,21 +443,17 @@ class FeatureRecognition:
             # 1. Skip if already fully matched
             if all(node in matched_node_indices for node in candidate_nodes):
                 continue
-
             # 2. Only proceed if these nodes are in our "suspect" set
             if not any(node in check_conjoined_pocket for node in candidate_nodes):
                 continue
 
             # Conjoined Pockets Logic
             G_blind, G_thru = self.build_conjoined_pocket(n_nodes)
-
             # Note: We use the permissive edge match here because subG2 HAS convex edges
             permissive_edge_match = lambda d1, d2: True
-
             gm_blind = isomorphism.GraphMatcher(candidate_graph, G_blind,
                                                 node_match=node_match,
                                                 edge_match=permissive_edge_match)
-
             gm_thru = isomorphism.GraphMatcher(candidate_graph, G_thru,
                                                node_match=node_match,
                                                edge_match=permissive_edge_match)
@@ -515,7 +499,6 @@ class FeatureRecognition:
         import numpy as np
 
         fig = go.Figure()
-
         feature_name_map = {
             'feat_hole_blind': 'Blind Hole',
             'feat_hole_through': 'Through Hole',
@@ -528,16 +511,14 @@ class FeatureRecognition:
             'unrecognized': 'Unrecognized Face',
             'stock': 'Part Body'
         }
-
         face_to_feature = {}
         for match in self.matches:
             feature_type = match['feature_type']
             for face_idx in match['node_indices']:
                 face_to_feature[face_idx] = feature_type
-
         feature_colors = self.colors_rgb
 
-        # Colored Features + mesh
+        # 1. Colored Features + mesh
         if show_mesh:
             feature_groups = {}
             for face_data in self.face_data_list:
@@ -623,9 +604,7 @@ class FeatureRecognition:
                 indices = [
                     f['index']
                     for f in self.face_data_list
-                    if f['type'] == ftype and f['stock_face'] != "Yes"
-                ]
-
+                    if f['type'] == ftype and f['stock_face'] != "Yes"]
                 if not indices:
                     continue
 
@@ -682,22 +661,18 @@ class FeatureRecognition:
                     showlegend=False
                 ))
 
-
-        # 2.5 FEATURE Labels (The new conditional block)
+        # 2.5 FEATURE Labels
         if show_feat_idx:
             feat_xs, feat_ys, feat_zs, feat_labels = [], [], [], []
-
             # We only want to label faces that are part of a recognized feature
             for match in self.matches:
                 f_id = match['feat_idx']
-                # Heuristic: Label all faces or just the bases for clarity?
-                # Let's do all node_indices for now:
+                # Label all faces
                 for face_idx in match['node_indices']:
                     center = self.face_data_list[face_idx]['face_center']
                     feat_xs.append(center[0])
                     feat_ys.append(center[1])
                     feat_zs.append(center[2])
-                    # Using <b> for bold and <br> to offset from the face index if needed
                     feat_labels.append(f"<b>ID:{f_id}</b>")
 
             if feat_labels:
@@ -705,7 +680,7 @@ class FeatureRecognition:
                     x=feat_xs, y=feat_ys, z=feat_zs,
                     mode='text',
                     text=feat_labels,
-                    textposition="bottom center",  # Offset from the face index at "top"
+                    textposition="bottom center",
                     textfont=dict(size=12, color="black"),
                     name='Feature IDs',
                     showlegend=True
@@ -716,7 +691,7 @@ class FeatureRecognition:
             edge_groups = {
                 'Convex': {
                     'x': [], 'y': [], 'z': [],
-                    'color': self.colors_rgb.get('edge_convex', (0, 0, 1)),  # Blue-ish
+                    'color': self.colors_rgb.get('edge_convex', (0, 0, 1)),  # Blueish
                     'width': 4
                 },
                 'Concave': {
@@ -784,7 +759,6 @@ class FeatureRecognition:
 
     #FOR AREA THING OF THROUGH POCKETS AND HOLES
     def get_feature_bbox(self, face_indices):
-        """Calculates the overall bounding box for a set of faces."""
         all_x, all_y, all_z = [], [], []
         for idx in face_indices:
             # Assuming face_data_list[idx] contains 'bbox' as [xmin, ymin, zmin, xmax, ymax, zmax]
@@ -798,17 +772,13 @@ class FeatureRecognition:
         return (min(all_x), min(all_y), min(all_z), max(all_x), max(all_y), max(all_z))
 
     def get_projected_area(self, feat_idx, axis_label):
-        """Calculates the footprint area of a feature projected onto the plane of the TAD."""
         # Find the match dictionary
         match = next((m for m in self.matches if m['feat_idx'] == feat_idx), None)
         if not match: return 0
-
         xmin, ymin, zmin, xmax, ymax, zmax = self.get_feature_bbox(match['node_indices'])
-
         dx = xmax - xmin
         dy = ymax - ymin
         dz = zmax - zmin
-
         # Projection depends on which way the tool is pointing
         if 'z' in axis_label:
             return dx * dy
@@ -816,34 +786,26 @@ class FeatureRecognition:
             return dy * dz
         elif 'y' in axis_label:
             return dx * dz
-
         return 0
 
     #vizualization
     def visualize_conjoined_pockets_2d(self):
         # 1. Filter for conjoined pockets only
         # Based on your PASS 2 prints, we look for 'feat_pocket_blind' or 'feat_pocket_through'
-        # that came from the candidate_candidates_2 logic.
-        # For simplicity, we filter the matches list.
         conjoined_matches = [f for f in self.matches if "pocket" in f['feature_type'].lower()]
-
         if not conjoined_matches:
             print("No conjoined pockets detected to visualize.")
             return
-
         # Use the global graph from the builder
         G = self.aag.G
-
         # Create a subplot for each conjoined pocket found
         num_pockets = len(conjoined_matches)
         fig, axes = plt.subplots(1, num_pockets, figsize=(8 * num_pockets, 7), squeeze=False)
-
         for i, feature in enumerate(conjoined_matches):
             nodes = feature['node_indices']
             # Create a subgraph for this specific feature
             subG = G.subgraph(nodes)
             ax = axes[0, i]
-
             pos = nx.spring_layout(subG, seed=42)
 
             # Node Colors
@@ -864,7 +826,6 @@ class FeatureRecognition:
             ax.set_title(f"Feature {feature['feat_idx']}: {feature['feature_type']}\nNodes: {nodes}")
             ax.axis('off')
 
-        # Add Legend (Reuse your existing legend logic)
         legend_elements = [
             Patch(facecolor=self.colors_rgb['geo_plane'], edgecolor='k', label='Plane'),
             Patch(facecolor=self.colors_rgb['geo_cylinder'], edgecolor='k', label='Cylinder'),

@@ -94,61 +94,6 @@ class AAGBuilder_3D:
         mesh_shape_for_visualization(self.shape, linear_deflection=0.1)
         self.vertices, self.triangles = extract_mesh_data(self.shape)
 
-    '''
-    #ONLY NEED IF I LOAD A FILE AND WANT TO CLASSIFY/MAP THE EDGES
-    def load_convexity_results(self):
-        self.edge_classification = {}
-        for edge_data in self.edge_data_list:
-            edge = edge_data['edge']
-            self.edge_classification[edge] = {
-                'edge_idx': edge_data['index'],
-                'edge' : edge_data['edge'],
-                'classification': edge_data['classification'],
-                'edge_geom': edge_data['edge_geom'],
-                'edge_length': edge_data['edge_length']
-            }
-        print(f"Loaded convexity results for {len(self.edge_data_list)} edges")
-
-    
-    def build_consistent_edge_mapping(self): #link the edges from the file to the ones from the edge_data_list
-        topo = TopologyExplorer(self.shape)
-        self.edges = list(topo.edges()) #get the edges
-        self.edge_id_map = {}
-        self.convexity_to_current_map = {}
-
-        for conv_id in self.edge_classification.keys():
-            if conv_id < len(self.edges):
-                edge = self.edges[conv_id]
-                key = edge_key(edge)
-                if key is not None:
-                    self.edge_id_map[key] = conv_id
-                    self.convexity_to_current_map[conv_id] = conv_id
-
-        print(f"Direct mapping: {len(self.edge_id_map)} edges mapped")
-
-        unmapped_conv = set(self.edge_classification.keys()) - set(self.convexity_to_current_map.keys())
-        for conv_id in unmapped_conv:
-            conv_data = self.edge_classification[conv_id]
-            conv_length = conv_data['edge_length']
-            for curr_id, edge in enumerate(self.edges):
-                if curr_id in self.convexity_to_current_map.values():
-                    continue
-                try:
-                    props = GProp_GProps()
-                    brepgprop_LinearProperties(edge, props)
-                    curr_length = props.Mass()
-                    if abs(curr_length - conv_length) < 0.1:
-                        key = edge_key(edge)
-                        if key is not None and key not in self.edge_id_map:
-                            self.edge_id_map[key] = conv_id
-                            self.convexity_to_current_map[conv_id] = curr_id
-                            break
-                except:
-                    continue
-
-        final_unmapped = set(self.edge_classification.keys()) - set(self.convexity_to_current_map.keys())
-        print(f"Final: {len(self.edge_id_map)} mapped, {len(final_unmapped)} unmapped")'''
-
     def visualize_3d_aag(self, show_mesh=True, mesh_opacity=0.2, node_size=10, hide_convex=False):
         import plotly.graph_objects as go
         from collections import Counter
@@ -332,10 +277,6 @@ class AAGBuilder_3D:
         print(f"\nTotal faces: {len(self.face_data_list)}")
         print(f"Total mesh edges: {len(self.edge_data_list)}")
         print(f"Graph/AAG links (drawn pairs): {len(drawn_pairs)}")
-
-
-
-
 
 
 
