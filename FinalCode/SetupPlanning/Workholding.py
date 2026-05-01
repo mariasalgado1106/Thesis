@@ -243,7 +243,7 @@ class Workholding:
 
                 # 6. Flagging Logic
                 # Criteria: H >= 1/3 (0.33), Len >= 2/3 (0.66), Area >= 2/3 (0.66)
-                is_valid = h_ratio >= 0.33 and len_ratio >= 0.66 and contact_area_ratio >= 0.66 and hanging_height_length_ratio <=3
+                is_valid = h_ratio >= 0.33 and len_ratio >= 0.66 and contact_area_ratio >= 0.33 and hanging_height_length_ratio <=3
                 status = "PASS" if is_valid else "FAIL"
 
                 '''print(f"Pair of faces {fa1}/{fa2} sucessfully validated.")
