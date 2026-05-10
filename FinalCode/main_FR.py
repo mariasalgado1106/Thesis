@@ -12,7 +12,7 @@ def main():
     display, start_display, add_menu, add_function_to_menu = init_display()
 
     # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "Part3.stp"))
+    my_shape = load_step_file(os.path.join("STEPFiles", "Part4.stp"))
     if not my_shape:
         return
 
@@ -55,7 +55,7 @@ def main():
         "[0-7]: "
     )
 
-    viz_occ = PartVisualizer_occ(builder2D, recognizer)
+    #viz_occ = PartVisualizer_occ(builder2D, recognizer)
     viz = Part_Visualizer(builder3D)
 
     if choice == "0":
