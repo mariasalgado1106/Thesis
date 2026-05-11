@@ -175,10 +175,10 @@ class Workholding:
         # TABLE HEADER
         print("\n" + "=" * 125)
         print(
-            f"{'Setup':<8} | {'Pair':<10} | {'Width':<8} | {'Height':<8} | {'Length':<8} | {'H-Ratio':<8} | {'L-Ratio':<8} | {'TArea-R':<8} | {'BArea-R':<8} | {'SFArea-R':<8} | {'HangH-L':<8} | {'Status'}")
+            f"{'Setup':<8} | {'Pair':<10} | {'Width':<8} | {'Height':<8} | {'Length':<8} | {'H-Ratio':<8} | {'L-Ratio':<8} | {'BArea-R':<8} | {'HangH-L':<8} | {'Status'}")
         print("-" * 125)
         print(
-            f"{'LIB':<8} | {'N/A':<10} | {vice_library['width']:<8.2f} | {vice_library['height']:<8.2f} | {vice_library['length']:<8.2f} | {'0.33':<8} | {'0.66':<8} | {'0.10':<8} | {'0.10':<8} | {'0.10':<8} | {'3.00':<8} | REFERENCE")
+            f"{'LIB':<8} | {'N/A':<10} | {vice_library['width']:<8.2f} | {vice_library['height']:<8.2f} | {vice_library['length']:<8.2f} | {'0.33':<8} | {'0.66':<8} | {'0.10':<8} | {'3.00':<8} | REFERENCE")
 
 
         for setup in self.optimized_plan:
@@ -252,9 +252,7 @@ class Workholding:
                 hanging_height = total_part_height - h_filt
                 hanging_height_length_ratio = (hanging_height)/total_len
 
-                global_area_ratio = total_clamped_area / total_part_surface_area
                 bbox_area_ratio = total_clamped_area / bbox_surface_area
-                stfaces_ratio = total_clamped_area / final_stfaces_area
 
 
                 # 7. Flagging Logic
@@ -272,16 +270,14 @@ class Workholding:
                 # Print Row
                 pair_str = f"{fa1}/{fa2}"
                 print(
-                    f"{setup_axis:<8} | {pair_str:<10} | {clamping_width:<8.2f} | {h_max:<8.2f} | {max_len:<8.2f} | {h_ratio:<8.2f} | {len_ratio:<8.2f} | {global_area_ratio:<8.2f} | {bbox_area_ratio:<8.2f} | {stfaces_ratio:<8.2f} | {hanging_height_length_ratio:<8.2f} | {status}")
+                    f"{setup_axis:<8} | {pair_str:<10} | {clamping_width:<8.2f} | {h_max:<8.2f} | {max_len:<8.2f} | {h_ratio:<8.2f} | {len_ratio:<8.2f} | {bbox_area_ratio:<8.2f} | {hanging_height_length_ratio:<8.2f} | {status}")
 
                 clamping_pairs.append({
                     'face_axis': (fa1, fa2),
                     'clamping_width': clamping_width,
                     'h_ratio': h_ratio,
                     'len_ratio': len_ratio,
-                    'global_area_ratio': global_area_ratio,
                     'bbox_area_ratio': bbox_area_ratio,
-                    'stfaces_ratio': stfaces_ratio,
                     'hanging_height_length_ratio': hanging_height_length_ratio,
                     'status': status,
                     'stability_score': total_clamped_area * h_ratio
