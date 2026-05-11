@@ -10,7 +10,7 @@ from SetupPlanning.Workholding import Workholding
 
 def main():
     # 1. Load STEP file
-    step_file = os.path.join("STEPFiles", "Part3.stp")
+    step_file = os.path.join("STEPFiles", "Part4.stp")
     my_shape = load_step_file(step_file)
     if not my_shape:
         print("Failed to load shape.")
