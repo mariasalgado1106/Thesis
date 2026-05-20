@@ -1,10 +1,7 @@
-from typing import Dict, List, Tuple
-import networkx as nx
-import plotly.graph_objects as go
+from typing import Dict, List
 from FeatureRecognition.aag_builder import AAGBuilder_2D, AAGBuilder_3D
 from FeatureRecognition.geometry_analysis import load_step_file, analyze_shape
 from FeatureRecognition.part_vizualizer_plotly import Part_Visualizer
-from networkx.generators.harary_graph import hkn_harary_graph
 import matplotlib.pyplot as plt
 import networkx as nx
 from matplotlib.patches import Patch
@@ -24,16 +21,14 @@ class FeatureLibrary:
             geometry='Cylinder',
             adjacent_faces=[1],
             stock_face='No',
-            role='wall'
-        )
+            role='wall')
         G_hole_blind.add_node(
             1,
             face_type='Plane',
             geometry='Plane',
             adjacent_faces=[0],
             stock_face='No',
-            role='base'
-        )
+            role='base')
         G_hole_blind.add_edge(0, 1, edge_type='concave')
         self.features['feat_hole_blind'] = G_hole_blind
 
@@ -45,36 +40,22 @@ class FeatureLibrary:
             geometry='Cylinder',
             adjacent_faces=[],
             stock_face='No',
-            role='wall'
-        )
+            role='wall')
         self.features['feat_hole_through'] = G_hole_through
 
         # Blind Pocket: 5 nodes, 1 base connected with concave to all the other 4 and
         # the other 4 creating a "loop" of concave connection
-        # all nodes are planes
         G_pocket_blind = nx.Graph()
-
-        G_pocket_blind.add_node(0, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 2, 3, 4], stock_face='No', role='base')
-
-        G_pocket_blind.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 2, 4], stock_face='No', role='wall')
-
-        G_pocket_blind.add_node(2, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 1, 3], stock_face='No', role='wall')
-
-        G_pocket_blind.add_node(3, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 2, 4], stock_face='No', role='wall')
-
-        G_pocket_blind.add_node(4, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 1, 3], stock_face='No', role='wall')
-
+        G_pocket_blind.add_node(0, face_type='Plane', geometry='Plane', adjacent_faces=[1, 2, 3, 4], stock_face='No', role='base')
+        G_pocket_blind.add_node(1, face_type='Plane', geometry='Plane', adjacent_faces=[0, 2, 4], stock_face='No', role='wall')
+        G_pocket_blind.add_node(2, face_type='Plane', geometry='Plane', adjacent_faces=[0, 1, 3], stock_face='No', role='wall')
+        G_pocket_blind.add_node(3, face_type='Plane', geometry='Plane', adjacent_faces=[0, 2, 4], stock_face='No', role='wall')
+        G_pocket_blind.add_node(4, face_type='Plane', geometry='Plane', adjacent_faces=[0, 1, 3], stock_face='No', role='wall')
         # 1. Connect Node 0 to all 4 walls
         G_pocket_blind.add_edge(0, 1, edge_type='concave')
         G_pocket_blind.add_edge(0, 2, edge_type='concave')
         G_pocket_blind.add_edge(0, 3, edge_type='concave')
         G_pocket_blind.add_edge(0, 4, edge_type='concave')
-
         # 2. Connect the walls to each other (The cycle 1-2-3-4-1)
         G_pocket_blind.add_edge(1, 2, edge_type='concave')
         G_pocket_blind.add_edge(2, 3, edge_type='concave')
@@ -82,44 +63,26 @@ class FeatureLibrary:
         G_pocket_blind.add_edge(4, 1, edge_type='concave')
         self.features['feat_pocket_blind'] = G_pocket_blind
 
-
         # Through Pocket: 4 nodes creating a "loop" of concave connection
         # all nodes are planes
         G_pocket_through = nx.Graph()
-        G_pocket_through.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[2, 4], stock_face='No', role='wall')
-
-        G_pocket_through.add_node(2, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 3], stock_face='No', role='wall')
-
-        G_pocket_through.add_node(3, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[2, 4], stock_face='No', role='wall')
-
-        G_pocket_through.add_node(4, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 3], stock_face='No', role='wall')
-
+        G_pocket_through.add_node(1, face_type='Plane', geometry='Plane', adjacent_faces=[2, 4], stock_face='No', role='wall')
+        G_pocket_through.add_node(2, face_type='Plane', geometry='Plane', adjacent_faces=[1, 3], stock_face='No', role='wall')
+        G_pocket_through.add_node(3, face_type='Plane', geometry='Plane', adjacent_faces=[2, 4], stock_face='No', role='wall')
+        G_pocket_through.add_node(4, face_type='Plane', geometry='Plane', adjacent_faces=[1, 3], stock_face='No', role='wall')
         G_pocket_through.add_edge(1, 2, edge_type='concave')
         G_pocket_through.add_edge(2, 3, edge_type='concave')
         G_pocket_through.add_edge(3, 4, edge_type='concave')
         G_pocket_through.add_edge(4, 1, edge_type='concave')
         self.features['feat_pocket_through'] = G_pocket_through
 
-
         # Blind Slot: 4 nodes, 0 and 1 connected and 2 and 3 connected to both 0 and 1
         # all nodes are planes
         G_slot_blind = nx.Graph()
-        G_slot_blind.add_node(0, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 2, 3], stock_face='No', role='base')
-
-        G_slot_blind.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 2, 3], stock_face='No', role='base')
-
-        G_slot_blind.add_node(2, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 1], stock_face='No', role='wall')
-
-        G_slot_blind.add_node(3, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 1], stock_face='No', role='wall')
-
+        G_slot_blind.add_node(0, face_type='Plane', geometry='Plane', adjacent_faces=[1, 2, 3], stock_face='No', role='base')
+        G_slot_blind.add_node(1, face_type='Plane', geometry='Plane', adjacent_faces=[0, 2, 3], stock_face='No', role='base')
+        G_slot_blind.add_node(2, face_type='Plane', geometry='Plane', adjacent_faces=[0, 1], stock_face='No', role='wall')
+        G_slot_blind.add_node(3, face_type='Plane', geometry='Plane', adjacent_faces=[0, 1], stock_face='No', role='wall')
         G_slot_blind.add_edge(0, 1, edge_type='concave')
         G_slot_blind.add_edge(0, 2, edge_type='concave')
         G_slot_blind.add_edge(0, 3, edge_type='concave')
@@ -130,15 +93,9 @@ class FeatureLibrary:
         # Through Slot: 3 nodes, 0 connected to both 1 and 2
         # all nodes are planes
         G_slot_through = nx.Graph()
-        G_slot_through.add_node(0, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 2], stock_face='No', role='base')
-
-        G_slot_through.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0], stock_face='No', role='wall')
-
-        G_slot_through.add_node(2, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0], stock_face='No', role='wall')
-
+        G_slot_through.add_node(0, face_type='Plane', geometry='Plane', adjacent_faces=[1, 2], stock_face='No', role='base')
+        G_slot_through.add_node(1, face_type='Plane', geometry='Plane', adjacent_faces=[0], stock_face='No', role='wall')
+        G_slot_through.add_node(2, face_type='Plane', geometry='Plane', adjacent_faces=[0], stock_face='No', role='wall')
         G_slot_through.add_edge(0, 1, edge_type='concave')
         G_slot_through.add_edge(0, 2, edge_type='concave')
         self.features['feat_slot_through'] = G_slot_through
@@ -146,15 +103,9 @@ class FeatureLibrary:
         # Blind Step: 3 nodes connected in "loop"
         # all nodes are planes
         G_step_blind = nx.Graph()
-        G_step_blind.add_node(0, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1, 2], stock_face='No', role='base')
-
-        G_step_blind.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 2], stock_face='No', role='base')
-
-        G_step_blind.add_node(2, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0, 1], stock_face='No', role='base')
-
+        G_step_blind.add_node(0, face_type='Plane', geometry='Plane', adjacent_faces=[1, 2], stock_face='No', role='base')
+        G_step_blind.add_node(1, face_type='Plane', geometry='Plane', adjacent_faces=[0, 2], stock_face='No', role='base')
+        G_step_blind.add_node(2, face_type='Plane', geometry='Plane', adjacent_faces=[0, 1], stock_face='No', role='base')
         G_step_blind.add_edge(0, 1, edge_type='concave')
         G_step_blind.add_edge(0, 2, edge_type='concave')
         G_step_blind.add_edge(1, 2, edge_type='concave')
@@ -163,15 +114,10 @@ class FeatureLibrary:
         # Through Step: 2 connected nodes
         # all nodes are planes
         G_step_through = nx.Graph()
-        G_step_through.add_node(0, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[1], stock_face='No', role='base')
-
-        G_step_through.add_node(1, face_type='Plane', geometry='Plane',
-                                adjacent_faces=[0], stock_face='No', role='base')
-
+        G_step_through.add_node(0, face_type='Plane', geometry='Plane', adjacent_faces=[1], stock_face='No', role='base')
+        G_step_through.add_node(1, face_type='Plane', geometry='Plane', adjacent_faces=[0], stock_face='No', role='base')
         G_step_through.add_edge(0, 1, edge_type='concave', role='base')
         self.features['feat_step_through'] = G_step_through
-
     def get(self, name: str) -> nx.Graph:
         #Return a copy of the pattern graph so you don't mutate the library
         return self.features[name].copy()
@@ -185,10 +131,8 @@ class FeatureRecognition:
         self.shape = my_shape
         (self.all_faces, self.face_data_list, self.analyser, self.all_edges,
          self.edge_data_list) = analyze_shape(self.shape)
-
         # library
         self.lib = FeatureLibrary()
-
         self.matches: List[Dict] = None
 
     def build_free_form_pocket(self, n):
@@ -231,38 +175,28 @@ class FeatureRecognition:
             # Connect to the previous wall
             if i > 1:
                 G_pocket_other_freeform_through.add_edge(i, i - 1, edge_type='concave')
-            #last wall doesnt connect with 1st
-
         return G_pocket_freeform_blind, G_pocket_freeform_through, G_pocket_other_freeform_through
 
     def is_conjoined_pocket(self, candidate_graph, candidate_nodes):
         # Conjoined Pockets: 1 base node connected to n-1 nodes, that are all connected in a loop
-        # (concave & convex)
-        # all nodes are planes
+        # (concave & convex) and all nodes are planes
         n = len(candidate_nodes)
         if n < 5: return False, 0, 0
-
         #BLIND
         # 1. Identify the Base Node (highest degree)
-        # In a conjoined pocket, the floor is connected to all walls.
         degrees = dict(candidate_graph.degree())
         base_node = max(degrees, key=degrees.get)
         if degrees[base_node] != n - 1:
             return False, 0, 0
-
         # 2. Check Edge Count Rule
         # We solve for 'p' (nr of pockets): p = 2(n-1) - Edges
         num_edges = candidate_graph.number_of_edges()
         p = (2 * (n - 1)) - num_edges
-        # If p > 1, it's likely a conjoined pocket
-        if p >= 2:
-            return True, p, base_node
+        if p >= 2: return True, p, base_node
         return False, 0, 0
 
     def build_conjoined_pocket(self, n):
-        if n < 4:
-            # Return empty graphs so nx.is_isomorphic will naturally fail
-            return nx.Graph(), nx.Graph(), nx.Graph()
+        if n < 4: return nx.Graph(), nx.Graph(), nx.Graph()
 
         # BLIND
         G_conjoined_pocket_blind = nx.Graph()
@@ -275,42 +209,32 @@ class FeatureRecognition:
             G_conjoined_pocket_blind.add_edge(0, i, edge_type='concave')
 
             # Connect to the previous wall
-            if i > 1:
-                G_conjoined_pocket_blind.add_edge(i, i - 1)
+            if i > 1: G_conjoined_pocket_blind.add_edge(i, i - 1)
 
         # last wall must connect back to the first wall (node 1)
-        if n > 2:
-            G_conjoined_pocket_blind.add_edge(n - 1, 1)
+        if n > 2: G_conjoined_pocket_blind.add_edge(n - 1, 1)
 
         # THROUGH -> NO BASE NODE
         G_conjoined_pocket_through = nx.Graph()
         for i in range(1, n + 1):
             G_conjoined_pocket_through.add_node(i, face_type='Plane', geometry='Plane', stock_face='No', role='wall')
             # Connect to the previous wall
-            if i > 1:
-                G_conjoined_pocket_through.add_edge(i, i - 1)
+            if i > 1: G_conjoined_pocket_through.add_edge(i, i - 1)
         # last wall must connect back to the first wall (node 1)
-        if n > 2:
-            G_conjoined_pocket_through.add_edge(n, 1)
+        if n > 2: G_conjoined_pocket_through.add_edge(n, 1)
 
         return G_conjoined_pocket_blind, G_conjoined_pocket_through
 
     def build_free_form_slot(self, n):
         # Free Form Slot: 1 base node connected to n-1 nodes
-        # all nodes are planes
         # THROUGH
         G_slot_freeform_through = nx.Graph()
-        # base node
-        G_slot_freeform_through.add_node(0, face_type='Plane', geometry='Plane',
-                                         stock_face='No', role='base')
+        G_slot_freeform_through.add_node(0, face_type='Plane', geometry='Plane', stock_face='No', role='base')
         if n>1:
-        # walls 1 -> n-1
             for i in range(1, n):
                 G_slot_freeform_through.add_node(i, face_type='Plane', geometry='Plane',
                                              stock_face='No', role='wall')
-            # Every wall connects to the base
                 G_slot_freeform_through.add_edge(0, i, edge_type='concave')
-
         return G_slot_freeform_through
 
     def identify_features(self) -> List[Dict]:
@@ -325,11 +249,9 @@ class FeatureRecognition:
         feat_found = 0
         matched_node_indices = set()
         check_conjoined_pocket = set()
-
         # Setup matching criteria
         node_match = isomorphism.categorical_node_match('face_type', None)
         edge_match = isomorphism.categorical_edge_match('edge_type', None)
-
         # 1. First Pass (NON-CONVEX EDGES)
         for candidate_info in feature_candidates:
             candidate_idx = candidate_info['subgraph_idx']
@@ -337,7 +259,6 @@ class FeatureRecognition:
             candidate_nodes = candidate_info['nodes']
             n_nodes = len(candidate_nodes)
             matched = False
-
             #1. Library
             for name, pattern in self.lib.features.items():
                 gm = isomorphism.GraphMatcher(candidate_graph, pattern,
@@ -350,22 +271,16 @@ class FeatureRecognition:
                         'feat_idx': feat_found,
                         'feature_type': name,
                         'node_indices': candidate_nodes,
-                        'tad_faces': tad_faces
-                    })
+                        'tad_faces': tad_faces})
                     matched = True
                     matched_node_indices.update(candidate_nodes)
-                    #print(f"MATCH! Feature {name} found")
                     break
-
             #2. Free-Form Pockets
             if not matched:
                 G_blind, G_thru, G_other = self.build_free_form_pocket(n_nodes)
-                gm_blind = isomorphism.GraphMatcher(candidate_graph, G_blind,node_match=node_match,
-                                              edge_match=edge_match)
-                gm_thru = isomorphism.GraphMatcher(candidate_graph, G_thru, node_match=node_match,
-                                                    edge_match=edge_match)
-                gm_other = isomorphism.GraphMatcher(candidate_graph, G_other, node_match=node_match,
-                                                    edge_match=edge_match)
+                gm_blind = isomorphism.GraphMatcher(candidate_graph, G_blind,node_match=node_match, edge_match=edge_match)
+                gm_thru = isomorphism.GraphMatcher(candidate_graph, G_thru, node_match=node_match, edge_match=edge_match)
+                gm_other = isomorphism.GraphMatcher(candidate_graph, G_other, node_match=node_match, edge_match=edge_match)
                 # Check Blind
                 if gm_blind.is_isomorphic():
                     tad_faces = [cand_node for cand_node, patt_node in gm_blind.mapping.items()
@@ -375,12 +290,9 @@ class FeatureRecognition:
                         'feat_idx': feat_found,
                         'feature_type': 'feat_pocket_blind',
                         'node_indices': candidate_nodes,
-                        'tad_faces': tad_faces
-                    })
+                        'tad_faces': tad_faces})
                     matched = True
                     matched_node_indices.update(candidate_nodes)
-                    #print(f"MATCH! Free-form blind pocket with {n_nodes} faces found.")
-
                 # Check Through
                 elif gm_thru.is_isomorphic():
                     tad_faces = [cand_node for cand_node, patt_node in gm_thru.mapping.items()
@@ -390,24 +302,18 @@ class FeatureRecognition:
                         'feat_idx': feat_found,
                         'feature_type': 'feat_pocket_through',
                         'node_indices': candidate_nodes,
-                        'tad_faces': tad_faces
-                    })
+                        'tad_faces': tad_faces})
                     matched = True
                     matched_node_indices.update(candidate_nodes)
-                    #print(f"MATCH! Free-form through pocket with {n_nodes} faces found.")
-
                 # Check Other
                 elif gm_other.is_isomorphic():
                     tad_faces = [cand_node for cand_node, patt_node in gm_other.mapping.items()
                                  if G_other.nodes[patt_node].get('role') == 'base']
                     check_conjoined_pocket.update(candidate_nodes)
-                    #print(f"MATCH! Free-form through pocket with {n_nodes} faces found.")
-
             # 3. Free Form Slots
             if not matched:
                 G_slot = self.build_free_form_slot(n_nodes)
-                gm_slot = isomorphism.GraphMatcher(candidate_graph, G_slot, node_match=node_match,
-                                                    edge_match=edge_match)
+                gm_slot = isomorphism.GraphMatcher(candidate_graph, G_slot, node_match=node_match, edge_match=edge_match)
                 if gm_slot.is_isomorphic():
                     tad_faces = [cand_node for cand_node, patt_node in gm_slot.mapping.items()
                                  if G_slot.nodes[patt_node].get('role') == 'base']
@@ -416,37 +322,26 @@ class FeatureRecognition:
                         'feat_idx': feat_found,
                         'feature_type': 'feat_slot_through',
                         'node_indices': candidate_nodes,
-                        'tad_faces': tad_faces
-                    })
+                        'tad_faces': tad_faces})
                     matched = True
                     matched_node_indices.update(candidate_nodes)
-                    #print(f"MATCH! Free-form through slot with {n_nodes} faces found.")
-
             # 4. Conjoined Pockets
             if not matched:
                 is_conjoined, num_pockets, base_node= self.is_conjoined_pocket(candidate_graph, candidate_nodes)
                 if is_conjoined:
                     check_conjoined_pocket.update(candidate_nodes)
-                    #print(f"MATCH! Conjoined feature found with {num_pockets} pockets.")
-
             # 5. Unrecognized
-            if not matched:
-                print(f"Candidate {candidate_idx} still unrecognized.")
-
+            if not matched: print(f"Candidate {candidate_idx} still unrecognized.")
         # 2. Second Pass (Conjoined - Only if nodes were flagged in Pass 1)
         for candidate_info in feature_candidates_2:
             candidate_graph = candidate_info['subgraph']
             candidate_nodes = candidate_info['nodes']
             n_nodes = len(candidate_nodes)
             matched = False
-
             # 1. Skip if already fully matched
-            if all(node in matched_node_indices for node in candidate_nodes):
-                continue
+            if all(node in matched_node_indices for node in candidate_nodes): continue
             # 2. Only proceed if these nodes are in our "suspect" set
-            if not any(node in check_conjoined_pocket for node in candidate_nodes):
-                continue
-
+            if not any(node in check_conjoined_pocket for node in candidate_nodes): continue
             # Conjoined Pockets Logic
             G_blind, G_thru = self.build_conjoined_pocket(n_nodes)
             # Note: We use the permissive edge match here because subG2 HAS convex edges
@@ -457,24 +352,20 @@ class FeatureRecognition:
             gm_thru = isomorphism.GraphMatcher(candidate_graph, G_thru,
                                                node_match=node_match,
                                                edge_match=permissive_edge_match)
-
             # Check Blind
             if gm_blind.is_isomorphic():
                 # Filter matches already in self.matches to avoid duplicates if necessary
                 tad_faces = [cand_node for cand_node, patt_node in gm_blind.mapping.items()
                              if G_blind.nodes[patt_node].get('role') == 'base']
-
                 feat_found += 1
                 self.matches.append({
                     'feat_idx': feat_found,
                     'feature_type': 'feat_pocket_blind',
                     'node_indices': candidate_nodes,
-                    'tad_faces': tad_faces
-                })
+                    'tad_faces': tad_faces})
                 matched = True
                 matched_node_indices.update(candidate_nodes)
                 print(f"MATCH! Conjoined blind pocket found (from flagged nodes).")
-
             # Check Through
             elif gm_thru.is_isomorphic():
                 feat_found += 1
@@ -482,12 +373,10 @@ class FeatureRecognition:
                     'feat_idx': feat_found,
                     'feature_type': 'feat_pocket_through',
                     'node_indices': candidate_nodes,
-                    'tad_faces': []
-                })
+                    'tad_faces': []})
                 matched = True
                 matched_node_indices.update(candidate_nodes)
                 print(f"MATCH! Conjoined through pocket found (from flagged nodes).")
-
             if not matched:
                 print(f"Candidate {candidate_idx} still unrecognized.")
         return self.matches
@@ -496,8 +385,6 @@ class FeatureRecognition:
                               show_face_centers=True, show_edges=True, show_feat_idx=True,
                               show_all_face_centers = False):
         import plotly.graph_objects as go
-        import numpy as np
-
         fig = go.Figure()
         feature_name_map = {
             'feat_hole_blind': 'Blind Hole',
@@ -509,8 +396,7 @@ class FeatureRecognition:
             'feat_step_blind': 'Blind Step',
             'feat_step_through': 'Through Step',
             'unrecognized': 'Unrecognized Face',
-            'stock': 'Part Body'
-        }
+            'stock': 'Part Body'}
         face_to_feature = {}
         for match in self.matches:
             feature_type = match['feature_type']
@@ -523,13 +409,9 @@ class FeatureRecognition:
             feature_groups = {}
             for face_data in self.face_data_list:
                 face_idx = face_data['index']
-
-                if face_data['stock_face'] == 'Yes':
-                    group_key = 'stock'
-                elif face_idx in face_to_feature:
-                    group_key = face_to_feature[face_idx]
-                else:
-                    group_key = 'unrecognized'
+                if face_data['stock_face'] == 'Yes': group_key = 'stock'
+                elif face_idx in face_to_feature: group_key = face_to_feature[face_idx]
+                else: group_key = 'unrecognized'
 
                 if group_key not in feature_groups:
                     feature_groups[group_key] = []
@@ -543,22 +425,15 @@ class FeatureRecognition:
                 for face_data in faces:
                     vertices = face_data.get('mesh_vertices', [])
                     triangles = face_data.get('mesh_triangles', [])
-
-                    if not vertices or not triangles:
-                        continue
-
+                    if not vertices or not triangles: continue
                     all_vertices.extend(vertices)
                     for tri in triangles:
                         all_triangles.append([
                             tri[0] + vertex_offset,
                             tri[1] + vertex_offset,
-                            tri[2] + vertex_offset
-                        ])
+                            tri[2] + vertex_offset])
                     vertex_offset += len(vertices)
-
-                if not all_vertices:
-                    continue
-
+                if not all_vertices: continue
                 if group_key == 'stock':
                     color_str = 'rgb(200, 200, 200)'
                     current_opacity = 0.1
@@ -569,9 +444,7 @@ class FeatureRecognition:
                     r, g, b = feature_colors.get(group_key, (0.7, 0.7, 0.7))
                     color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
                     current_opacity = mesh_opacity
-
                 display_name = feature_name_map.get(group_key, group_key)
-
                 fig.add_trace(go.Mesh3d(
                     x=[v[0] for v in all_vertices],
                     y=[v[1] for v in all_vertices],
@@ -585,82 +458,61 @@ class FeatureRecognition:
                     showlegend=True,
                     flatshading=False,
                     lighting=dict(ambient=0.5, diffuse=0.8, specular=0.2),
-                    lightposition=dict(x=100, y=200, z=300)
-                ))
-
+                    lightposition=dict(x=100, y=200, z=300)))
         # 2. FACE nodes
         if show_face_centers:
             face_types = [f['type'] for f in self.face_data_list]
             centers = [f['face_center'] for f in self.face_data_list]
-
             face_colors = {
                 'Plane': self.colors_rgb.get('geo_plane', (0, 1, 0)),
                 'Cylinder': self.colors_rgb.get('geo_cylinder', (1, 0, 0)),
-                'Other': self.colors_rgb.get('geo_other', (0, 0, 1))
-            }
-
+                'Other': self.colors_rgb.get('geo_other', (0, 0, 1))}
             for ftype in sorted(set(face_types)):
                 # only non-stock faces
                 indices = [
                     f['index']
                     for f in self.face_data_list
                     if f['type'] == ftype and f['stock_face'] != "Yes"]
-                if not indices:
-                    continue
-
+                if not indices: continue
                 xs = [centers[i][0] for i in indices]
                 ys = [centers[i][1] for i in indices]
                 zs = [centers[i][2] for i in indices]
-
                 r, g, b = face_colors.get(ftype, (0.5, 0.5, 0.5))
                 color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
-
                 fig.add_trace(go.Scatter3d(
                     x=xs, y=ys, z=zs,
                     mode='markers+text',
                     marker=dict(size=5, color=color_str, line=dict(width=1, color='black')),
                     text=[str(i) for i in indices],
                     name=f'{ftype} Nodes',
-                    showlegend=False
-                ))
-
+                    showlegend=False))
         if show_all_face_centers:
             face_types = [f['type'] for f in self.face_data_list]
             centers = [f['face_center'] for f in self.face_data_list]
-
             face_colors = {
                 'Plane': self.colors_rgb.get('geo_plane', (0, 1, 0)),
                 'Cylinder': self.colors_rgb.get('geo_cylinder', (1, 0, 0)),
-                'Other': self.colors_rgb.get('geo_other', (0, 0, 1))
-            }
+                'Other': self.colors_rgb.get('geo_other', (0, 0, 1))}
 
             for ftype in sorted(set(face_types)):
                 # only non-stock faces
                 indices = [
                     f['index']
                     for f in self.face_data_list
-                    if f['type'] == ftype
-                ]
-
-                if not indices:
-                    continue
-
+                    if f['type'] == ftype]
+                if not indices: continue
                 xs = [centers[i][0] for i in indices]
                 ys = [centers[i][1] for i in indices]
                 zs = [centers[i][2] for i in indices]
-
                 r, g, b = face_colors.get(ftype, (0.5, 0.5, 0.5))
                 color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
-
                 fig.add_trace(go.Scatter3d(
                     x=xs, y=ys, z=zs,
                     mode='markers+text',
                     marker=dict(size=5, color=color_str, line=dict(width=1, color='black')),
                     text=[str(i) for i in indices],
                     name=f'{ftype} Nodes',
-                    showlegend=False
-                ))
-
+                    showlegend=False))
         # 2.5 FEATURE Labels
         if show_feat_idx:
             feat_xs, feat_ys, feat_zs, feat_labels = [], [], [], []
@@ -674,7 +526,6 @@ class FeatureRecognition:
                     feat_ys.append(center[1])
                     feat_zs.append(center[2])
                     feat_labels.append(f"<b>ID:{f_id}</b>")
-
             if feat_labels:
                 fig.add_trace(go.Scatter3d(
                     x=feat_xs, y=feat_ys, z=feat_zs,
@@ -683,91 +534,57 @@ class FeatureRecognition:
                     textposition="bottom center",
                     textfont=dict(size=12, color="black"),
                     name='Feature IDs',
-                    showlegend=True
-                ))
-
+                    showlegend=True))
         # 3. EDGES
         if show_edges:
-            edge_groups = {
-                'Convex': {
-                    'x': [], 'y': [], 'z': [],
-                    'color': self.colors_rgb.get('edge_convex', (0, 0, 1)),  # Blueish
-                    'width': 4
-                },
-                'Concave': {
-                    'x': [], 'y': [], 'z': [],
-                    'color': self.colors_rgb.get('edge_concave', (1, 0, 0)),  # Red
-                    'width': 4
-                },
-                'Tangent': {
-                    'x': [], 'y': [], 'z': [],
-                    'color': (0.5, 0.5, 0.5), #self.colors_rgb.get('edge_tangent', (0, 1, 0)),  # Green
-                    'width': 3
-                },
-                'Unknown': {
-                    'x': [], 'y': [], 'z': [],
-                    'color': (0.5, 0.5, 0.5),
-                    'width': 2
-                }
-            }
-
+            edge_groups = {'Convex': {'x': [], 'y': [], 'z': [],
+                    'color': self.colors_rgb.get('edge_convex', (0, 0, 1)), 'width': 4},
+                'Concave': {'x': [], 'y': [], 'z': [],
+                    'color': self.colors_rgb.get('edge_concave', (1, 0, 0)), 'width': 4},
+                'Tangent': {'x': [], 'y': [], 'z': [],
+                    'color': (0.5, 0.5, 0.5), 'width': 3},
+                'Unknown': {'x': [], 'y': [], 'z': [],
+                    'color': (0.5, 0.5, 0.5), 'width': 2}}
             for edge in self.edge_data_list:
-                # Type
                 etype = 'Tangent'
-                if edge.get('classification'):
-                    etype = edge['classification'][0]  # Take the first classification
-
+                if edge.get('classification'): etype = edge['classification'][0]  # Take the first classification
                 # Geometry Points
                 points = edge.get('points', [])
-                if len(points) == 0:
-                    continue
-
+                if len(points) == 0: continue
                 group = edge_groups.get(etype, edge_groups['Unknown'])
-
                 group['x'].extend([p[0] for p in points] + [None])
                 group['y'].extend([p[1] for p in points] + [None])
                 group['z'].extend([p[2] for p in points] + [None])
-
             for name, group in edge_groups.items():
-                if not group['x']:
-                    continue
-
+                if not group['x']: continue
                 r, g, b = group['color']
                 color_str = f'rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})'
-
                 fig.add_trace(go.Scatter3d(
                     x=group['x'], y=group['y'], z=group['z'],
                     mode='lines',
                     line=dict(color=color_str, width=group['width']),
                     name=f"{name} Edges",
-                    showlegend=True
-                ))
-
+                    showlegend=True))
         fig.update_layout(
             title="Feature Recognition Visualization",
             scene=dict(
                 xaxis_title="X",
                 yaxis_title="Y",
                 zaxis_title="Z",
-                aspectmode="data"
-            ),
+                aspectmode="data"),
             legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-            width=1200, height=900
-        )
+            width=1200, height=900 )
         fig.show()
-
 
     #FOR AREA THING OF THROUGH POCKETS AND HOLES
     def get_feature_bbox(self, face_indices):
         all_x, all_y, all_z = [], [], []
         for idx in face_indices:
-            # Assuming face_data_list[idx] contains 'bbox' as [xmin, ymin, zmin, xmax, ymax, zmax]
             bbox = self.face_data_list[idx].get('bbox')
             if bbox:
                 all_x.extend([bbox[0], bbox[3]])
                 all_y.extend([bbox[1], bbox[4]])
                 all_z.extend([bbox[2], bbox[5]])
-
         if not all_x: return (0, 0, 0, 0, 0, 0)
         return (min(all_x), min(all_y), min(all_z), max(all_x), max(all_y), max(all_z))
 
@@ -807,32 +624,26 @@ class FeatureRecognition:
             subG = G.subgraph(nodes)
             ax = axes[0, i]
             pos = nx.spring_layout(subG, seed=42)
-
             # Node Colors
             node_colors = []
             for n in subG.nodes:
                 face_type = subG.nodes[n].get('face_type', 'Other')
                 node_colors.append(self.colors_rgb.get(f'geo_{face_type.lower()}', self.colors_rgb['geo_other']))
-
             # Edge Colors
             edge_colors = []
             for u, v, d in subG.edges(data=True):
                 e_type = d.get('edge_type', 'other')
                 edge_colors.append(self.colors_rgb.get(f'edge_{e_type}', (0.5, 0.5, 0.5)))
-
             nx.draw_networkx(subG, pos=pos, ax=ax, with_labels=True,
                              node_color=node_colors, edge_color=edge_colors, node_size=800)
 
             ax.set_title(f"Feature {feature['feat_idx']}: {feature['feature_type']}\nNodes: {nodes}")
             ax.axis('off')
-
         legend_elements = [
             Patch(facecolor=self.colors_rgb['geo_plane'], edgecolor='k', label='Plane'),
             Patch(facecolor=self.colors_rgb['geo_cylinder'], edgecolor='k', label='Cylinder'),
             Line2D([0], [0], color=self.colors_rgb['edge_convex'], lw=2, label='Convex Edge'),
-            Line2D([0], [0], color=self.colors_rgb['edge_concave'], lw=2, label='Concave Edge'),
-        ]
+            Line2D([0], [0], color=self.colors_rgb['edge_concave'], lw=2, label='Concave Edge')]
         plt.legend(handles=legend_elements, loc='lower right')
         plt.tight_layout()
         plt.show()
-
