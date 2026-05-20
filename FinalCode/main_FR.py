@@ -3,9 +3,7 @@ from OCC.Display.SimpleGui import init_display
 from FeatureRecognition.geometry_analysis import (load_step_file, analyze_shape, print_face_analysis_table, print_edge_analysis_table)
 from FeatureRecognition.aag_builder import AAGBuilder_2D, AAGBuilder_3D
 from FeatureRecognition.feature_recognition import FeatureRecognition
-from FeatureRecognition.part_visualizer_occ import PartVisualizer_occ
 from FeatureRecognition.part_vizualizer_plotly import Part_Visualizer
-
 
 def main():
     # Initialize display
@@ -25,8 +23,6 @@ def main():
     # PART 2: Build AAG
     print("\n PART 2: AAG CONSTRUCTION")
     builder2D = AAGBuilder_2D(my_shape)
-    subgraphs_info = builder2D.analyse_subgraphs()
-
     builder3D = AAGBuilder_3D(my_shape)
     builder3D.load_shape()
 
@@ -52,50 +48,33 @@ def main():
         "(5) 3D AAG, "
         "(6) 3D AAG without convex edges, "
         "(7) Only Conjoined Pockets (2D AAG) "
-        "[0-7]: "
-    )
-
-    #viz_occ = PartVisualizer_occ(builder2D, recognizer)
+        "[0-7]: ")
     viz = Part_Visualizer(builder3D)
-
     if choice == "0":
-        #builder3D.visualize_numbered_faces()
         viz.visualize_numbered_faces()
-
     if choice in ["1"]:
         viz.visualize_geometric_edges()
-
     if choice in ["2"]: #dont show faces or edges
         recognizer.visualize_features_3d(
             show_mesh=True,
             show_face_centers=False,
             show_edges=False,
-            show_feat_idx=False
-        )
-
+            show_feat_idx=False)
     if choice in ["3"]: #show faces & edges
         recognizer.visualize_features_3d(
             show_mesh=True,
             show_face_centers=False,
-            show_edges=True
-        )
-
+            show_edges=True)
     if choice == "4":
         builder2D.visualize_2d_aag()
-
     if choice == "5":
         builder3D.visualize_3d_aag(hide_convex=False)
-
     if choice == "6":
         builder3D.visualize_3d_aag(hide_convex=True)
-
     if choice == "7":
         recognizer.identify_features()
         recognizer.visualize_conjoined_pockets_2d()
-
     start_display()
-
-
 if __name__ == "__main__":
     main()
 
