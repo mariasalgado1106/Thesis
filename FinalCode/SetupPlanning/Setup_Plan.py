@@ -5,12 +5,8 @@ from SetupPlanning.TAD_and_Dependencies import TAD_Extraction, Dependencies
 import numpy as np
 import itertools
 
-from OCC.Core.BRepProj import BRepProj_Projection
-from OCC.Core.gp import gp_Pnt, gp_Dir, gp_Lin
-from OCC.Core.BRepClass3d import BRepClass3d_SolidClassifier
 from OCC.Core.GProp import GProp_GProps
 from OCC.Core.BRepGProp import brepgprop
-from networkx.generators.harary_graph import hkn_harary_graph
 
 
 class Setup_Plan:
@@ -27,7 +23,7 @@ class Setup_Plan:
         self.dep_extractor = Dependencies(self.shape, recognizer=self.recognizer)
         self.feature_info = self.dep_extractor.identify_relationships()
 
-    #### Grouping ####
+    #### Grouping
     def group_by_tads(self):
         groups = {}
         for feat in self.feature_info:
@@ -56,7 +52,7 @@ class Setup_Plan:
                 grouped_types['others'].append(feat)
         return grouped_types
 
-    ### Define stock faces and their characteristics ####
+    ### Define stock faces and their characteristics
 
     def define_stock_faces_list(self):
         # stock faces list -> to after use for workholding
@@ -66,7 +62,6 @@ class Setup_Plan:
             f_idx = f['index']
             f_area = f['face_area']
             opposite_tad = f['normal_vector_axis']
-
             if is_stock_face == "Yes":
                 stock_faces.append({
                     'stock_face_idx': f_idx,
@@ -74,7 +69,6 @@ class Setup_Plan:
                     'opposite_TAD': opposite_tad, # basically, if z then this can be base face for TAD z
                     'perpendicular_stock_faces': []
                 })
-
         for sf in stock_faces:
             for sf_2 in stock_faces:
                 # Check if they are different and sf_2 is not already added
@@ -89,7 +83,6 @@ class Setup_Plan:
     def are_faces_perpendicular(self, f1_idx, f2_idx, tolerance=1e-3):
         normal1 = self.face_data_list[f1_idx]['normal_vector_coords']
         normal2 = self.face_data_list[f2_idx]['normal_vector_coords']
-
         n1 = np.array(normal1)
         n2 = np.array(normal2)
         mag1 = np.linalg.norm(n1)
@@ -100,19 +93,15 @@ class Setup_Plan:
         # Normalize
         n1_unit = n1 / mag1
         n2_unit = n2 / mag2
-
         dot_product = np.dot(n1_unit, n2_unit)
-
         # If dot product is ~0, they are 90 degrees apart
         return abs(dot_product) < tolerance
 
     def get_original_stock_area(self, axis):
         xmin, ymin, zmin, xmax, ymax, zmax, _ = get_stock_box(self.shape)
-
         dx = abs(xmax - xmin)
         dy = abs(ymax - ymin)
         dz = abs(zmax - zmin)
-
         # Area depends on which plane we are looking at
         if 'x' in axis:
             return dy * dz
@@ -122,16 +111,14 @@ class Setup_Plan:
             return dx * dy
         return 0
 
-    #### define the points for locators based on grid ###
+    #### define the points for locators based on grid
 
     def generate_locating_grid(self, xLFs, axis, step_size=1.0):
         axis_map = {
             'z': (0, 1, 2), '-z': (0, 1, 2),
             'x': (1, 2, 0), '-x': (1, 2, 0),
-            'y': (0, 2, 1), '-y': (0, 2, 1)
-        }
+            'y': (0, 2, 1), '-y': (0, 2, 1)}
         idx1, idx2, fixed_idx = axis_map[axis.lower()]
-
         # bounding box
         xmin, ymin, zmin, xmax, ymax, zmax, _ = get_stock_box(self.shape)
         bounds = [(xmin, xmax), (ymin, ymax), (zmin, zmax)]
@@ -139,7 +126,6 @@ class Setup_Plan:
         dim2_range = np.arange(bounds[idx2][0], bounds[idx2][1], step_size)
 
         grid_points = []
-
         # check each point against PLF meshes (if it's solid or empty)
         for v1 in dim1_range:
             for v2 in dim2_range:
@@ -148,11 +134,9 @@ class Setup_Plan:
                     f_idx = xlf['Face_idx']
                     vertices = self.face_data_list[f_idx]['mesh_vertices']
                     triangles = self.face_data_list[f_idx]['mesh_triangles']
-                    # Point-in-Triangle check (projected to 2D)
                     if self._is_point_in_face_mesh(v1, v2, vertices, triangles, idx1, idx2):
                         is_on_material = True
                         break
-
                 if is_on_material:
                     # Store the actual 3D coordinate of the valid point
                     h = xLFs[0]['Face_center'][fixed_idx] #use 3rd coord from center of faces
@@ -162,13 +146,12 @@ class Setup_Plan:
         return grid_points
 
     def _is_point_in_face_mesh(self, u, v, vertices, triangles, idx1, idx2):
-        """Helper to check if 2D point (u,v) is inside any triangle of the mesh."""
+        #check if point is inside any triangle of the mesh
         for tri in triangles:
             # 2D projection of the triangle vertices
             p1 = vertices[tri[0]]
             p2 = vertices[tri[1]]
             p3 = vertices[tri[2]]
-
             if self._point_in_triangle_2d(u, v, p1[idx1], p1[idx2],
                                           p2[idx1], p2[idx2],
                                           p3[idx1], p3[idx2]):
@@ -231,10 +214,8 @@ class Setup_Plan:
                     is_point_safe = False
                     break
                 i -= 1
-
             if is_point_safe:
                 safe_points.append(p)
-
         return idx1, idx2, safe_points
 
     def find_locators(self, grid_points_PLF, PLF_axis, grid_points_SLF, SLF_axis, grid_points_TLF, TLF_axis):
@@ -251,7 +232,6 @@ class Setup_Plan:
                 tries += 1
                 offset_plf -= 5
                 continue
-
             # 1.2. QUADRANT SAMPLING FOR BETTER BALANCE
             # Separate points into 4 lists based on their position relative to CoG
             q_lists = [
@@ -290,7 +270,6 @@ class Setup_Plan:
                             max_area = area
                             PLF_locators = (p1, p2, p3)
                             is_balanced = True
-
                 if is_balanced:
                     print(f"Success: Balanced solution found at k={k}")
                     break
@@ -301,8 +280,6 @@ class Setup_Plan:
                 break
             tries += 1
             offset_plf -= 5
-
-
         # 1.3. FINAL FALLBACK (If still no balance, just take the biggest possible)
         if not PLF_locators:
             print("Final Fallback: No balanced solution possible. Choosing max area.")
@@ -311,7 +288,6 @@ class Setup_Plan:
             p3 = max(safe_points, key=lambda p: self.calculate_2d_area(p1, p2, p, (idx1, idx2)))
             PLF_locators = (p1, p2, p3)
             is_balanced = False  # Still unbalanced, but at least we have a solution
-
 
         ######## 2. SLF LOCATORS ###########
         offset_slf = 15
@@ -327,15 +303,13 @@ class Setup_Plan:
         plf_normal_idx = list({0, 1, 2} - set(axis_map[PLF_axis.lower()]))[0] #height
         slf_normal_idx = list({0, 1, 2} - set(axis_map[SLF_axis.lower()]))[0]
         search_idx = list({0, 1, 2} - {plf_normal_idx, slf_normal_idx})[0] #width, tlf axis
-
         # 2.2. Filter to Parallel Points (same height)
         unique_heights = sorted(list(set(p[plf_normal_idx] for p in safe_points_slf)))
         median_height = unique_heights[len(unique_heights) // 2]
         parallel_points = [p for p in safe_points_slf if p[plf_normal_idx] == median_height]
         if len(parallel_points) < 2:
             parallel_points = safe_points_slf
-
-        # 3. Maximize Distance along the width (search_idx)
+        # 2.3. Maximize Distance along the width (search_idx)
         p1_slf = min(parallel_points, key=lambda p: p[search_idx])
         p2_slf = max(parallel_points, key=lambda p: p[search_idx])
         SLF_locators = (p1_slf, p2_slf)
@@ -351,25 +325,22 @@ class Setup_Plan:
         # Pick the point closest to the geometric center of the safe area for max stability
         avg_dim1 = np.mean([p[idx1_tlf] for p in safe_points_tlf])
         avg_dim2 = np.mean([p[idx2_tlf] for p in safe_points_tlf])
-
         p1_tlf = min(safe_points_tlf, key=lambda p: (p[idx1_tlf] - avg_dim1) ** 2 +
                                                     (p[idx2_tlf] - avg_dim2) ** 2)
         TLF_locators = (p1_tlf,)
-
+        # Below are function to vizualize the safe grids obtained
         #self.visualize_safe_points(grid_points_PLF, safe_points, PLF_axis)
         #self.visualize_safe_points(grid_points_SLF, safe_points_slf, SLF_axis)
         #self.visualize_safe_points(grid_points_SLF, parallel_points, SLF_axis)
         #self.visualize_safe_points(grid_points_TLF, safe_points_tlf, TLF_axis)
-
         return PLF_locators, is_balanced, SLF_locators, TLF_locators
 
     def validate_workholding (self, axis):
         # apply 321 technique based on the final part (worst case scenario)
         PLFs, SLFs, TLFs = [], [], []
         PLF, SLF, TLF = [], [], []
-
         ##########################################################
-        # 1. Get stock faces and possible base face (Primary Locating Face) & SLF & TLF
+        # 1. Get stock faces and possible base face (PLF) & SLF & TLF
         stock_faces = self.define_stock_faces_list()
         PLF_total_area = 0
         # 1.1. Perpendicular faces based on axis (to determine slf and tlf)
@@ -399,13 +370,10 @@ class Setup_Plan:
                     'SLF_area': sf_area
                 })
                 perp_data[sf_axis]['total_area'] += sf_area
-
-
         ###############################################################
         # 2. Get SLFs and TLFs faces (perpendicularity & biggest area)
         slf_axis = max(perp_data, key=lambda k: perp_data[k]['total_area'])
         SLFs = perp_data[slf_axis]['faces']
-
         pa1, pa2, pa3, pa4 = perpendicular_axis[axis]
         new_perp_axis = {pa1: (pa3, pa4), pa2: (pa3, pa4), pa3: (pa1, pa2), pa4: (pa1, pa2)}
         perp_data2 = {pa: {'faces': [], 'total_area': 0} for pa in new_perp_axis[slf_axis]}
@@ -423,7 +391,6 @@ class Setup_Plan:
                 perp_data2[sf_axis]['total_area'] += sf_area
         tlf_axis = max(perp_data2, key=lambda k: perp_data2[k]['total_area'])
         TLFs = perp_data2[tlf_axis]['faces']
-
         ###############################################################
         # 3. Validate areas based on area ratio (30% of original)
         validated = True
@@ -434,7 +401,6 @@ class Setup_Plan:
             if area_ratio < 30:
                 print(f"WARNING: Stability compromised! Only {area_ratio:.1f}% of the base remains.")
                 validated = False
-
         # 3.2. SLF
         original_area = self.get_original_stock_area(slf_axis)
         SLF_total_area = perp_data[slf_axis]['total_area']
@@ -443,7 +409,6 @@ class Setup_Plan:
             if area_ratio < 30:
                 print(f"WARNING: Stability compromised! Only {area_ratio:.1f}% of the SLF remains.")
                 validated = False
-
         # 3.3. TLF
         original_area = self.get_original_stock_area(tlf_axis)
         TLF_total_area = perp_data[tlf_axis]['total_area']
@@ -452,7 +417,6 @@ class Setup_Plan:
             if area_ratio < 30:
                 print(f"WARNING: Stability compromised! Only {area_ratio:.1f}% of the TLF remains.")
                 validated = False
-
         #############################################################
         # 4. Find locator points
         PLF_grid_pts = self.generate_locating_grid(PLFs, axis)
@@ -471,40 +435,29 @@ class Setup_Plan:
                     'PLF_faces': PLFs,
                     'PLF_locators': PLF_locators
                 })
-                #print(f"Primary Locators: {PLF_locators} & CoG Balanced?: {balanced}")
-
         # 4.2. Find 2 locators in SLF
         if len(SLF_grid_pts) >= 2 and validated:
             SLF = ({
                 'SLF_faces': SLFs,
                 'SLF_locators': SLF_locators
             })
-            #print(f"Secondary Locators: {SLF_locators}")
-
         # 4.3. Find 1 locator in TLF
         if len(TLF_grid_pts) >= 1 and validated:
             TLF = ({
                 'TLF_faces': TLFs,
                 'TLF_locators': TLF_locators
             })
-            #print(f"Terciary Locator: {TLF_locators}")
-
-
         return PLF, SLF, TLF, validated
-
 
     def generate_optimized_plan(self):
         ### 1. features grouped by tads
         groups = self.group_by_tads()
-
         ### 2. order tads (max features 1st)
         # sort by the length of the feature list in each group
         sorted_setups = sorted([axis for axis in groups if axis != "INACCESSIBLE"],
             key=lambda x: len(groups[x]), reverse=True)
-
         optimized_plan = [] # setups in order, respective features, PLF, SLF, TLF
         already_planned = set() #features that were already done, for filtering after
-
         # Initialize tracking for sharp edges
         extra_setup_tracker = []
         for feat in self.features:
@@ -525,17 +478,13 @@ class Setup_Plan:
             features_to_order = [f for f in groups[axis] if f['feat_idx'] not in already_planned]
             # 2. Check if we need to keep going just for sharp edges
             active_sharp_reqs = [s for s in extra_setup_tracker if s['remaining_setups'] > 0 and axis in s['tads']]
-
             if not features_to_order and not active_sharp_reqs:
                 continue
-
             is_extra_setup_only = len(features_to_order) == 0
             if is_extra_setup_only:
                 print(f"\n>>> Creating EXTRA Setup: {axis} (Sharp Edges Requirement)")
             else:
                 print(f"\n>>> Planning Setup: {axis} ({len(features_to_order)} features)")
-
-
             print(f"\n>>> Planning Setup: {axis} ({len(features_to_order)} features)")
 
             ### 3. Validate setup (check the workholding and faces used)
@@ -580,24 +529,19 @@ class Setup_Plan:
             setup_label = step['setup']
             if step['is_extra_only']:
                 setup_label += " (EXTRA)"
-
             primary_seq = str(step['sequence'])
             extra_seq = str(step['extra_features']) if step['extra_features'] else "-"
-
             print(f"{setup_label:<10} | {primary_seq:<30} | {extra_seq}")
-
         print("=" * 80 + "\n")
 
         return optimized_plan
 
-
-
-    def order_in_setup(self, features_of_setup, current_setup_axis):
+    ### Extra visualization or helper functions
+    def order_in_setup(self, features_of_setup, current_setup_axis): #extra function
         # order the features within a setup, based on:
         # 1. feature type (holes and others -> minimize tool swaps)
         # 2. base face area (max 1st for stability)
         # 3. dependencies
-
         # prioritize starting with "others" and holes for last
         for f in features_of_setup:
             relevant_tad = next((t for t in f['tads'] if t['axis'] == current_setup_axis), None)
@@ -605,11 +549,9 @@ class Setup_Plan:
                 # Blind Features -> tad face area
                 f['priority_area'] = self.face_data_list[relevant_tad['tad_face_index']]['face_area']
                 new = self.recognizer.get_projected_area(f['feat_idx'], current_setup_axis)
-                #print(f"area inicial = {f['priority_area']} vs nova {new}")
             elif relevant_tad != "none":
                 # Through -> max area from all faces
                 f['priority_area'] = self.recognizer.get_projected_area(f['feat_idx'], current_setup_axis)
-
         ordered_list = []
         pending = list(features_of_setup)  # feat not done still
         previous_was_hole = 0
@@ -623,7 +565,6 @@ class Setup_Plan:
                 if all(d in [o['feat_idx'] for o in ordered_list] for d in axis_deps):
                     available.append(f)
                     # if dependencies were already ordered, it is available; or if there are none
-
             if not available:
                 # If nothing is available but pending is not empty, we get stuck in a loop
                 if pending:
@@ -643,34 +584,26 @@ class Setup_Plan:
             else:
                 chosen = max(grouped['others'], key=lambda x: x['priority_area'])
                 previous_was_hole = 0
-
             ordered_list.append(chosen)
             pending.remove(chosen)
-
         return ordered_list
 
     def print_grouped_tads_and_dependencies(self):
         groups = self.group_by_tads()
-
         print("\n" + "=" * 80)
         print(f"{'SETUP (TAD)':<15} | {'FEATURE IDs':<30} | {'DEPENDENCIES'}")
         print("-" * 80)
-
         for axis in sorted(groups.keys()):
             feats = groups[axis]
-            feat_ids = [str(f['feat_idx']) for f in feats]
-
             for f in feats:
                 deps = ", ".join(map(str, f['dependency'])) if f['dependency'] else "None"
                 # We print one row per feature in the setup group
                 print(f"{axis:<15} | Feature {f['feat_idx']:<22} | Needs: {deps}")
-
             print("-" * 80)
 
     def visualize_safe_points(self, raw_grid, safe_points, axis_label):
         import plotly.graph_objects as go
         import numpy as np
-
         fig = go.Figure()
 
         # 1. Plot Raw Grid (Light Red)
@@ -701,7 +634,6 @@ class Setup_Plan:
     def visualize_setup_3d(self, PLF_locs=None, SLF_locs=None, TLF_locs=None, cog=None):
         import plotly.graph_objects as go
         import numpy as np
-
         fig = go.Figure()
 
         # 1. Show the Part Mesh (Grey/Translucent for context)
@@ -745,7 +677,7 @@ class Setup_Plan:
         add_locators(SLF_locs, "Secondary (SLF)", "red", ["S1", "S2"])
         add_locators(TLF_locs, "Tertiary (TLF)", "green", ["T1"])
 
-        # 3. Plot the CoG (Optional, but helpful for balance context)
+        # 3. Plot the CoG
         if cog is not None:
             fig.add_trace(go.Scatter3d(
                 x=[cog[0]], y=[cog[1]], z=[cog[2]],
@@ -763,7 +695,6 @@ class Setup_Plan:
     def visualize_all_setups_3d(self, optimized_plan, show_edges=True):
         import plotly.graph_objects as go
         import numpy as np
-
         fig = go.Figure()
 
         # 1. Part Body

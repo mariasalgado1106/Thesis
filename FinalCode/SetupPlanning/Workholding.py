@@ -5,7 +5,6 @@ from SetupPlanning.Setup_Plan import Setup_Plan
 
 import numpy as np
 
-
 class Workholding:
     def __init__(self, my_shape, recognizer=None):
         self.shape = my_shape
@@ -84,9 +83,7 @@ class Workholding:
                         res_pnt[idx2] = v2
                         res_pnt[fixed_idx] = h_val
                         grid_points.append(tuple(res_pnt))
-
         total_area = len(grid_points) * (step_size ** 2)
-        #print(f"Total Common Clamping Area: {total_area} mm²")
         return grid_points, total_area
 
     def find_height_and_length (self, common_pts, setup, face_axis):
@@ -128,7 +125,6 @@ class Workholding:
                 h_sorted = sorted(heights)
             h_limit = h_sorted[0]
             max_heights.append(abs(round(stock_min_h - h_sorted[len(h_sorted)-1])))
-
             for i in range(1, len(h_sorted)):
                 if abs(h_sorted[i] - h_sorted[i - 1]) > (step_size * 1.1):
                     break
@@ -141,13 +137,12 @@ class Workholding:
         # h_max is the MINIMUM max height without intersecting tool (feats in that setup)
         h_min = min(min_heights) if min_heights else 0
         h_max = min(max_heights) if max_heights else 0
-
         # max_len is the total horizontal span
         max_len = np.max(pts_arr[:, idx_len]) - np.min(pts_arr[:, idx_len])
 
         return max_len, idx_len, h_min, h_max, idx_height
 
-    # ACTUAL
+    # ACTUAL Function
     def clamping_faces (self):
         vice_library = {
             'width': 200,
@@ -180,14 +175,12 @@ class Workholding:
         print(
             f"{'LIB':<8} | {'N/A':<10} | {vice_library['width']:<8.2f} | {vice_library['height']:<8.2f} | {vice_library['length']:<8.2f} | {'0.33':<8} | {'0.66':<8} | {'3.00':<8} | {'0.05':<8} | REFERENCE")
 
-
         for setup in self.optimized_plan:
             setup_axis = setup['setup']
             pf1,pf2,pf3,pf4 = perpendicular_axis[setup_axis]
             pairs_parallel_faces = {(pf1,pf2), (pf3,pf4)}
             clamping_pairs = []
             print(f"\nSetup {setup_axis}:")
-
             for fa1,fa2 in pairs_parallel_faces: #fa = face axis
                 #print(f"VALIDATING Pair {fa1}/{fa2}.")
                 max_min_pts = {'x': (self.xmin, self.xmax),
@@ -232,40 +225,17 @@ class Workholding:
                 pts_f2 = [p for p in grid2 if abs(p[idx_height] - ref_floor) <= h_filt]
                 total_clamped_area = (len(pts_f1) + len(pts_f2)) * (0.5 ** 2)
 
-                '''# 5. Contact area validation
-                h_filt = min(h_max, vice_library['height'])
-                is_pos = setup_axis in ['x', 'y', 'z']
-                ref_floor = max_min_pts[setup_axis.replace('-', '')][1 if is_pos else 0]
-                if is_pos:  # If setup is +X, height goes "down" from Xmax
-                    filtered_pts = [p for p in common_pts if abs(p[idx_height] - ref_floor) <= h_filt]
-                else:  # If setup is -X, height goes "up" from Xmin
-                    filtered_pts = [p for p in common_pts if abs(p[idx_height] - ref_floor) <= h_filt]
-                common_area_filt = len(filtered_pts) * (0.5 ** 2)  # 0.5 is step size
-                theoretical_jaw_area = max_len * h_filt
-                contact_area_ratio = common_area_filt / (theoretical_jaw_area)'''
-
                 # 6. RATIOS
                 h_ratio = h_max / total_part_height
-
                 len_ratio = max_len/total_len
-
                 hanging_height = total_part_height - h_filt
                 hanging_height_length_ratio = (hanging_height)/total_len
-
                 bbox_area_ratio = total_clamped_area / bbox_surface_area
-
 
                 # 7. Flagging Logic
                 is_valid = (h_ratio >= 0.33 and len_ratio >= 0.66 and bbox_area_ratio >= 0.05
                             and hanging_height_length_ratio <= 3)
                 status = "PASS" if is_valid else "WARN"
-
-                '''print(f"Pair of faces {fa1}/{fa2} sucessfully validated.")
-                print(f"-> Clamping Width: {clamping_width} mm.")
-                print(f"-> Max Heigth without intersecting features of this setup: {h_max} mm.")
-                print(f"-> Min Height without intersecting any feature's openings: {h_min} mm.")
-                print(f"-> Length of common area: {max_len} mm.")
-                print(f"-> Stability score: {stability_score}.")'''
                 # Print Row
                 pair_str = f"{fa1}/{fa2}"
                 print(
@@ -288,15 +258,11 @@ class Workholding:
         print("=" * 125 + "\n")
         return clamping_faces_info
 
-
-
     # helper visualization
     def visualize_common_area(self, axis1, axis2, common_points):
         import plotly.graph_objects as go
         import numpy as np
-
         fig = go.Figure()
-
         # Helper to plot 3D points
         def add_trace(pts, name, color, opac, size):
             # Check if pts is actually a list/array
@@ -304,18 +270,14 @@ class Workholding:
                 return
             if len(pts) == 0:
                 return
-
             # Ensure we are only looking at the points, even if a float sneaked into the list
             valid_pts = [p for p in pts if isinstance(p, (list, tuple, np.ndarray))]
-
             if not valid_pts:
                 return
-
             lengths = set(len(p) for p in valid_pts)
             if len(lengths) > 1:
                 print(f"Error in {name}: Inconsistent dimensions {lengths}")
                 return
-
             pts_arr = np.array(valid_pts)
             fig.add_trace(go.Scatter3d(
                 x=pts_arr[:, 0], y=pts_arr[:, 1], z=pts_arr[:, 2],
@@ -335,104 +297,3 @@ class Workholding:
             scene=dict(xaxis_title="X", yaxis_title="Y", zaxis_title="Z", aspectmode="data")
         )
         fig.show()
-
-    '''def final_clamping_suggestion(self):
-            clamping_info = self.clamping_faces()
-            width_tolerance = 15.0  # mm
-
-            # 1. Collect ALL possible pairs from ALL setups into one list
-            all_possible_pairs = []
-            for setup in clamping_info:
-                for pair in setup['face_pairs']:
-                    pair['parent_setup'] = setup['setup_axis']
-                    all_possible_pairs.append(pair)
-
-            # 2. Cluster widths -> find a width that satisfies the maximum number of setups
-            all_possible_pairs.sort(key=lambda x: x['clamping_width'])
-
-            potential_groups = []
-            for p in all_possible_pairs:
-                assigned = False
-                for group in potential_groups:
-                    if abs(p['clamping_width'] - np.mean(group['widths'])) <= width_tolerance:
-                        group['pairs'].append(p)
-                        group['widths'].append(p['clamping_width'])
-                        group['unique_setups'].add(p['parent_setup'])
-                        assigned = True
-                        break
-                if not assigned:
-                    potential_groups.append({
-                        'pairs': [p],
-                        'widths': [p['clamping_width']],
-                        'unique_setups': {p['parent_setup']}
-                    })
-
-            # Sort by how many unique setups they cover (Descending)-> prioritizes the "Universal Vice"
-            potential_groups.sort(key=lambda x: len(x['unique_setups']), reverse=True)
-
-            # 3. ASSIGN SETUPS TO GROUPS
-            selected_setups_map = {}  # setup_axis -> best pair within the best group
-            remaining_setups = set(s['setup_axis'] for s in clamping_info)
-            final_groups_data = []
-
-            for group in potential_groups:
-                # If this group contains setups we haven't satisfied yet
-                setups_in_group = group['unique_setups'].intersection(remaining_setups)
-
-                if setups_in_group:
-                    group_setups_indices = []
-                    group_widths = []
-                    group_h_maxes = []
-                    group_h_mins = []
-                    group_lengths = []
-
-                    for s_axis in list(setups_in_group):
-                        # Pick the best pair within THIS width group for this setup
-                        pairs_for_this_setup = [p for p in group['pairs'] if p['parent_setup'] == s_axis]
-                        best_pair_in_group = max(pairs_for_this_setup, key=lambda x: x['stability_score'])
-
-                        # Log data for the final envelope
-                        group_setups_indices.append(s_axis)
-                        group_widths.append(best_pair_in_group['clamping_width'])
-                        group_h_maxes.append(best_pair_in_group['clamping_max_height'])
-                        group_h_mins.append(best_pair_in_group['clamping_min_height'])
-                        group_lengths.append(best_pair_in_group['clamping_max_length'])
-
-                        remaining_setups.remove(s_axis)
-
-                        f1, f2 = best_pair_in_group['face_axis']
-                        print(
-                            f"Group Assignment: Setup {s_axis} assigned to width ~{np.mean(group['widths']):.1f} using {f1}/{f2}")
-
-                    final_groups_data.append({
-                        'setups': group_setups_indices,
-                        'widths': group_widths,
-                        'h_maxes': group_h_maxes,
-                        'h_mins': group_h_mins,
-                        'lengths': group_lengths
-                    })
-
-            # 4. FORMAT OUTPUT
-            print("\n" + "=" * 50)
-            print("MINIMIZED WORKHOLDING SUGGESTION (VIRTUAL VICES)")
-            print("=" * 50)
-
-            final_suggestion = {}
-            for i, g in enumerate(final_groups_data):
-                name = f"Virtual Vice {i + 1}"
-                envelope = {
-                    'Associated Setups': g['setups'],
-                    'Required Opening (Width)': round(max(g['widths']), 2),
-                    'Max Allowable Jaw Height (Tool Safety)': round(min(g['h_maxes']), 2),
-                    'Min Effective Grip Height (Feature Safety)': round(min(g['h_mins']), 2),
-                    'Min Jaw Width (Length)': round(max(g['lengths']), 2)
-                }
-                final_suggestion[name] = envelope
-
-                print(f"\n>>> {name}")
-                for k, v in envelope.items():
-                    print(f"  {k}: {v}")
-
-            return final_suggestion
-        '''
-
