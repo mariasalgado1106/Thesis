@@ -6,7 +6,7 @@ from SetupPlanning.Setup_Plan import Setup_Plan
 from SetupPlanning.Workholding import Workholding
 def main():
     # 1. Load STEP file
-    step_file = os.path.join("STEPFiles", "Part4.stp")
+    step_file = os.path.join("STEPFiles", "Part1.stp")
     my_shape = load_step_file(step_file)
     if not my_shape: return
     # 2. Feature Recognition & TAD Extraction

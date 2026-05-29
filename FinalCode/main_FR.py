@@ -8,7 +8,7 @@ def main():
     # Initialize display
     display, start_display, add_menu, add_function_to_menu = init_display()
     # Load STEP file
-    my_shape = load_step_file(os.path.join("STEPFiles", "Part3.stp"))
+    my_shape = load_step_file(os.path.join("STEPFiles", "Part2.stp"))
     if not my_shape: return
     # PART 1: Geometry Analysis
     print("\n PART 1: GEOMETRY ANALYSIS")
